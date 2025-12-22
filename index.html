@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student QR Generator</title>
+  <style>
+    :root {
+      --pad: 14px; --radius: 12px; --border: #d0d7de; --err: #b42318;
+      --blue: #0969da;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f8fa; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    .hint { color: #57606a; font-size: 12px; margin-top: 6px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-top: 14px; }
+    .grid > .full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: #57606a; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; }
+    input:focus { outline: 2px solid rgba(9,105,218,.25); border-color: var(--blue); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    button.danger { background: #b42318; border-color: #b42318; color: #fff; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    .error { color: var(--err); font-size: 13px; margin-top: 10px; display:none; }
+    .meta { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #f6f8fa; border: 1px solid var(--border); font-size: 13px; }
+
+    /* ===== Full-screen modal ===== */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: none;
+      z-index: 9999;
+      padding: 16px;
+    }
+    .modal[aria-hidden="false"] { display: grid; place-items: center; }
+    .modalPanel {
+      width: min(560px, 100%);
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 10px 35px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+    .modalHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+    .modalHeader h2 { font-size: 16px; margin: 0; }
+    .modalBody { padding: 14px 16px 16px; }
+    .modalHint { color: #57606a; font-size: 12px; margin-top: 6px; }
+    #modalQR {
+      width: 320px; height: 320px;
+      margin: 12px auto 0;
+      display: grid; place-items: center;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: #fff;
+    }
+    .modalFooter {
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      background: #fff;
+    }
+    .warnText {
+      text-align: center;
+      font-size: 12px;
+      color: #57606a;
+      margin-top: 10px;
+      min-height: 18px; /* keeps layout stable */
+    }
+
+    /* On very small screens, maximize QR */
+    @media (max-width: 420px) {
+      #modalQR { width: 92vw; height: 92vw; }
+    }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Generate Your Photo QR Code</h1>
+      <div class="hint">Fill this out while you’re in line. After you generate, keep the QR on your screen.</div>
+
+      <div class="grid">
+        <div>
+          <label for="first">First name</label>
+          <input id="first" autocomplete="given-name" />
+        </div>
+        <div>
+          <label for="last">Last name</label>
+          <input id="last" autocomplete="family-name" />
+        </div>
+        <div class="full">
+          <label for="sid">Student ID (7 digits)</label>
+          <input id="sid" inputmode="numeric" autocomplete="off" placeholder="2026###" maxlength="7" />
+          <div class="hint">Format: 20 + (26–29) + (000–999). Example: 2026123</div>
+          <div id="err" class="error"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="generate" class="primary">Generate QR</button>
+        <button id="clear">Clear</button>
+      </div>
+
+      <div class="meta">
+        <div id="validPill" class="pill" style="display:none;"></div>
+        <div id="gradePill" class="pill" style="display:none;"></div>
+      </div>
+
+      <div class="hint" style="margin-top: 12px;">
+        Tip: If you’re in multiple clubs, tap Clear and generate again for the next session.
+      </div>
+    </div>
+  </div>
+
+  <!-- Full-screen modal -->
+  <div id="qrModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="QR Code">
+    <div class="modalPanel">
+      <div class="modalHeader">
+        <h2>Your QR Code</h2>
+        <!-- intentionally no "X" button to prevent accidental dismiss -->
+      </div>
+      <div class="modalBody">
+        <div class="modalHint">Show this QR at checkout. Do not close until you are done.</div>
+        <div id="modalQR"><span class="hint">Generating…</span></div>
+        <div id="warnText" class="warnText"></div>
+      </div>
+      <div class="modalFooter">
+        <button id="modalClose" class="">Close</button>
+        <button id="modalClear" class="danger">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QRCode.js (client-side) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    // ===== Student ID rules =====
+    // 7 digits: "20" + (26–29) + (000–999)
+    const STUDENT_ID_RE = /^20(2[6-9])\d{3}$/;
+
+    // 2025–2026 school-year mapping
+    function gradeFromId(studentId) {
+      const gradYear = Number(studentId.slice(0, 4));
+      const map = { 2026: "Senior", 2027: "Junior", 2028: "Sophomore", 2029: "Freshman" };
+      return map[gradYear] || "Unknown";
+    }
+
+    // ===== Persistence (cookie + localStorage backup) =====
+    const COOKIE_NAME = "bmc_last_qr_payload";
+    const LS_KEY = "bmc_last_qr_payload";
+
+    function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days*24*60*60*1000));
+      const expires = "expires=" + d.toUTCString();
+      document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/;SameSite=Lax";
+    }
+    function getCookie(name) {
+      const key = name + "=";
+      const parts = document.cookie.split(";");
+      for (let p of parts) {
+        p = p.trim();
+        if (p.indexOf(key) === 0) return decodeURIComponent(p.substring(key.length));
+      }
+      return "";
+    }
+    function deleteCookie(name) {
+      document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;SameSite=Lax";
+    }
+    function savePayload(payloadStr) {
+      try { setCookie(COOKIE_NAME, payloadStr, 7); } catch(e) {}
+      try { localStorage.setItem(LS_KEY, payloadStr); } catch(e) {}
+    }
+    function loadPayload() {
+      const c = getCookie(COOKIE_NAME);
+      if (c) return c;
+      try { return localStorage.getItem(LS_KEY) || ""; } catch(e) { return ""; }
+    }
+    function clearSavedPayload() {
+      deleteCookie(COOKIE_NAME);
+      try { localStorage.removeItem(LS_KEY); } catch(e) {}
+    }
+
+    // ===== DOM helpers =====
+    const $ = (id) => document.getElementById(id);
+
+    const firstEl = $("first");
+    const lastEl  = $("last");
+    const sidEl   = $("sid");
+    const errEl   = $("err");
+    const gradePill = $("gradePill");
+    const validPill = $("validPill");
+
+    const modal = $("qrModal");
+    const modalQRBox = $("modalQR");
+    const warnText = $("warnText");
+    const modalCloseBtn = $("modalClose");
+    const modalClearBtn = $("modalClear");
+
+    let modalQR = null;
+    let closeArmed = false;
+    let clearArmed = false;
+
+    function setError(msg) {
+      if (!msg) { errEl.style.display = "none"; errEl.textContent = ""; return; }
+      errEl.style.display = "block";
+      errEl.textContent = msg;
+    }
+
+    function updateValidationUI() {
+      sidEl.value = sidEl.value.replace(/[^\d]/g, "").slice(0, 7);
+      const sid = sidEl.value.trim();
+      const ok = STUDENT_ID_RE.test(sid);
+
+      if (sid.length === 0) {
+        validPill.style.display = "none";
+        gradePill.style.display = "none";
+        setError("");
+        return false;
+      }
+
+      validPill.style.display = "inline-block";
+      validPill.textContent = ok ? "Student ID: Valid" : "Student ID: Invalid";
+
+      gradePill.style.display = ok ? "inline-block" : "none";
+      gradePill.textContent = ok ? `Grade: ${gradeFromId(sid)} (Grad ${sid.slice(0,4)})` : "";
+
+      setError(ok ? "" : "Student ID must be 7 digits and start with 2026–2029 (e.g., 2026123).");
+      return ok;
+    }
+
+    // ===== Modal logic =====
+    function openModal() {
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden"; // prevent background scroll
+      resetArming();
+    }
+    function closeModal(force = false) {
+      if (!force) return; // we never close without the double-confirm flow
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      resetArming();
+      warnText.textContent = "";
+    }
+    function resetArming() {
+      closeArmed = false;
+      clearArmed = false;
+      modalCloseBtn.textContent = "Close";
+      modalCloseBtn.classList.remove("danger");
+      modalClearBtn.textContent = "Clear";
+      // Clear button already looks danger; we only change text
+    }
+    function setWarn(msg) { warnText.textContent = msg || ""; }
+
+    function renderModalQR(payloadStr) {
+      // Clear previous QR
+      modalQRBox.innerHTML = "";
+      modalQR = new QRCode(modalQRBox, {
+        text: payloadStr,
+        width: 320,
+        height: 320,
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    // Prevent click-outside dismiss
+    modal.addEventListener("click", (e) => {
+      // Only clicks on overlay background should be ignored (no action)
+      // We'll do nothing either way, so students can't accidentally dismiss.
+      e.stopPropagation();
+    });
+
+    // Prevent ESC dismiss (many browsers still allow ESC to affect focus; we block our logic)
+    window.addEventListener("keydown", (e) => {
+      if (modal.getAttribute("aria-hidden") === "false") {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setWarn("Tap Close twice to exit, or Clear twice to reset.");
+        }
+      }
+    });
+
+    modalCloseBtn.addEventListener("click", () => {
+      if (!closeArmed) {
+        closeArmed = true;
+        clearArmed = false;
+        modalCloseBtn.textContent = "Close (tap again)";
+        modalCloseBtn.classList.add("danger");
+        modalClearBtn.textContent = "Clear";
+        setWarn("Tap Close again to confirm.");
+        // Auto-disarm after a few seconds to reduce accidental double-tap
+        setTimeout(() => { if (closeArmed) { resetArming(); setWarn(""); } }, 5000);
+        return;
+      }
+      closeModal(true);
+    });
+
+    modalClearBtn.addEventListener("click", () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        closeArmed = false;
+        modalClearBtn.textContent = "Clear (tap again)";
+        modalCloseBtn.textContent = "Close";
+        modalCloseBtn.classList.remove("danger");
+        setWarn("Tap Clear again to confirm. This removes your QR.");
+        setTimeout(() => { if (clearArmed) { resetArming(); setWarn(""); } }, 5000);
+        return;
+      }
+      // Confirmed clear: wipe form + stored payload + close modal
+      doFullClear();
+      closeModal(true);
+    });
+
+    // ===== Core actions =====
+    function generatePayloadFromForm() {
+      const first = firstEl.value.trim();
+      const last  = lastEl.value.trim();
+      const sidOk = updateValidationUI();
+      const sid   = sidEl.value.trim();
+
+      if (!first || !last) { setError("Please enter both first and last name."); return ""; }
+      if (!sidOk) { setError("Please enter a valid Student ID."); return ""; }
+
+      setError("");
+
+      const payloadObj = {
+        v: 1,
+        first,
+        last,
+        studentId: sid,
+        grade: gradeFromId(sid),
+        gradYear: Number(sid.slice(0, 4))
+      };
+      return JSON.stringify(payloadObj);
+    }
+
+    function generateAndShow() {
+      const payloadStr = generatePayloadFromForm();
+      if (!payloadStr) return;
+
+      savePayload(payloadStr);
+      renderModalQR(payloadStr);
+      openModal();
+    }
+
+    function doFullClear() {
+      firstEl.value = "";
+      lastEl.value = "";
+      sidEl.value = "";
+      validPill.style.display = "none";
+      gradePill.style.display = "none";
+      setError("");
+      clearSavedPayload();
+      // Also clear the modal QR area
+      modalQRBox.innerHTML = '<span class="hint">QR cleared</span>';
+      firstEl.focus();
+    }
+
+    // ===== Wire up main page buttons =====
+    $("generate").addEventListener("click", generateAndShow);
+    sidEl.addEventListener("input", updateValidationUI);
+
+    $("clear").addEventListener("click", () => {
+      // For the main page, we’ll keep it simple (single tap clear),
+      // since the modal has the “double confirm” safety.
+      doFullClear();
+    });
+
+    // Enter-to-generate
+    [firstEl, lastEl, sidEl].forEach(el => el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") generateAndShow();
+    }));
+
+    // ===== Restore last QR on refresh =====
+    window.addEventListener("load", () => {
+      const saved = loadPayload();
+      if (!saved) return;
+
+      // Try to prefill form fields (nice-to-have)
+      try {
+        const obj = JSON.parse(saved);
+        if (obj && obj.first) firstEl.value = obj.first;
+        if (obj && obj.last) lastEl.value = obj.last;
+        if (obj && obj.studentId) sidEl.value = String(obj.studentId);
+        updateValidationUI();
+      } catch (e) {}
+
+      // Re-show modal with stored QR
+      renderModalQR(saved);
+      openModal();
+      setWarn("Restored your last QR after refresh.");
+      setTimeout(() => { setWarn(""); }, 2500);
+    });
+  </script>
+</body>
+</html>
