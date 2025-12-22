@@ -370,9 +370,30 @@
     if (/^20\d{5}$/.test(s)) return s;
     try {
       const o = JSON.parse(s);
-      return String(o.id || o.studentId || o.sid || "").trim();
+      return String(o.id || o.studentId || o.sid || o.SID || "").trim();
     } catch { return ""; }
   }
+
+  // ---- infer gradYear/grade from StudentID prefix (first 4 digits) ----
+  function inferGradYearFromSid(sid) {
+    const m = String(sid || "").match(/^(\d{4})/);
+    return m ? Number(m[1]) : null;
+  }
+
+  function inferGradeFromGradYear(gradYear, asOf = new Date()) {
+    if (!Number.isFinite(gradYear)) return null;
+
+    const y = asOf.getFullYear();
+    const m = asOf.getMonth(); // 0=Jan ... 11=Dec
+
+    // July rollover: after June, we consider the new school year started
+    const schoolYearEnds = (m >= 6) ? (y + 1) : y;
+
+    // In the school year ending in gradYear, student is 12th grade
+    const grade = 12 - (gradYear - schoolYearEnds);
+    return (grade >= 9 && grade <= 12) ? grade : null;
+  }
+
 
   // ---- GAS wrapper ----
   function gas(fn, args, ok, fail) {
@@ -479,6 +500,8 @@
 
     const t = Date.now();
     const studentIdGuess = extractStudentId(payload);
+    const gradYear = inferGradYearFromSid(studentIdGuess);
+    const grade = inferGradeFromGradYear(gradYear);
 
     const btnToBusy = source === "manual" ? els.btnSubmitManual : null;
     const oldText = btnToBusy ? btnToBusy.textContent : "";
@@ -486,7 +509,7 @@
 
     gas(
       "recordScan",
-      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, state.pos, state.sessionId],
+      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, state.pos, state.sessionId, gradYear, grade],
       (res) => {
         if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
         showStatus(res);

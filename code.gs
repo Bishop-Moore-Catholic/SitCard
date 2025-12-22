@@ -84,12 +84,12 @@ function getClientConfig() {
  * Record a scan with LOCAL counters from the client.
  *
  * payloadRaw can be:
- *  - JSON string {"id":"20xxxxx","first":"...","last":"...","grade":"11","gradYear":"2026"}  (from QR)
+ *  - JSON string {"sid":"20xxxxx","f":"...","l":"..."} (lean QR) OR {"id":"20xxxxx","first":"...","last":"..."}  (from QR)
  *  - ID-only "20xxxxx" (manual)
  *
  * rowNumber/rowPosition/sessionId/club come from the client.
  */
-function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId) {
+function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId, gradYearParam, gradeParam) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
 
@@ -126,15 +126,31 @@ function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId) 
     }
 
     const studentId = String(obj.id || obj.studentId || obj.sid || "").trim();
-    const firstName = String(obj.first || obj.firstName || "").trim();
-    const lastName  = String(obj.last  || obj.lastName  || "").trim();
+    const firstName = String(obj.first || obj.firstName || obj.f || "").trim();
+    const lastName  = String(obj.last  || obj.lastName  || obj.l || "").trim();
 
     // Accept numeric or string values; store as clean strings
-    const gradeVal = (obj.grade ?? obj.Grade ?? "");
-    const gradYearVal = (obj.gradYear ?? obj.graduationYear ?? obj.grad_year ?? "");
+    const gradeVal = (gradeParam ?? obj.grade ?? obj.Grade ?? "");
+    const gradYearVal = (gradYearParam ?? obj.gradYear ?? obj.graduationYear ?? obj.grad_year ?? "");
 
-    const grade = String(gradeVal).trim();
-    const gradYear = String(gradYearVal).trim();
+    let grade = String(gradeVal).trim();
+    let gradYear = String(gradYearVal).trim();
+
+    // If missing, infer from StudentID prefix (first 4 digits = gradYear)
+    if (!gradYear && /^\d{4}/.test(studentId)) {
+      gradYear = studentId.slice(0, 4);
+    }
+
+    // If grade still missing and gradYear is valid, infer grade for current school year
+    if (!grade && /^\d{4}$/.test(gradYear)) {
+      const gy = Number(gradYear);
+      const now = new Date();
+      const y = now.getFullYear();
+      const mo = now.getMonth(); // 0=Jan
+      const schoolYearEnds = (mo >= 6) ? (y + 1) : y; // July rollover
+      const g = 12 - (gy - schoolYearEnds);
+      if (g >= 9 && g <= 12) grade = String(g);
+    }
 
     if (!STUDENT_ID_REGEX.test(studentId)) {
       sh.appendRow([ts, sid, clubSafe, operator, rowNum, rowPos, studentId, firstName, lastName, grade, gradYear, raw, "INVALID_ID", notesSafe]);
