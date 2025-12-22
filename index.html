@@ -72,6 +72,14 @@
       border: 1px dashed var(--border);
       border-radius: 14px;
       background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #modalQR canvas,
+    #modalQR img {
+      display: block;
+      margin: auto;
     }
     .modalFooter {
       display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
@@ -281,8 +289,8 @@
       modalQRBox.innerHTML = "";
       modalQR = new QRCode(modalQRBox, {
         text: payloadStr,
-        width: 320,
-        height: 320,
+        width: 300,
+        height: 300,
         correctLevel: QRCode.CorrectLevel.M
       });
     }
