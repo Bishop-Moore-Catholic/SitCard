@@ -196,11 +196,6 @@
   <script>
     const STUDENT_ID_RE = /^20(2[6-9])\d{3}$/;
 
-    function gradeFromId(id) {
-      const y = Number(id.slice(0,4));
-      return {2026:"Senior",2027:"Junior",2028:"Sophomore",2029:"Freshman"}[y] || "Unknown";
-    }
-
     const firstEl = document.getElementById("first");
     const lastEl = document.getElementById("last");
     const sidEl = document.getElementById("sid");
@@ -226,20 +221,19 @@
     }
 
     function buildPayload(){
-      if (!firstEl.value || !lastEl.value) { setError("Enter first and last name"); return ""; }
+      if (!firstEl.value || !lastEl.value) {
+        setError("Enter first and last name");
+        return "";
+      }
       if (!validateSid()) return "";
 
-      const gradYear = Number(sidEl.value.slice(0,4));
-
       return JSON.stringify({
-        v: 1,
-        first: firstEl.value.trim(),
-        last: lastEl.value.trim(),
-        studentId: sidEl.value,
-        grade: gradeFromId(sidEl.value),
-        gradYear: gradYear
+        f: firstEl.value.trim(),
+        l: lastEl.value.trim(),
+        sid: sidEl.value
       });
     }
+
 
     function renderQR(payload){
       const tmp = document.createElement("div");
@@ -281,10 +275,9 @@
       if (!match) return;
       const payload = decodeURIComponent(match[1]);
       try {
-        const obj = JSON.parse(payload);
-        firstEl.value = obj.first || "";
-        lastEl.value = obj.last || "";
-        sidEl.value = obj.studentId || "";
+        firstEl.value = obj.f || "";
+        lastEl.value = obj.l || "";
+        sidEl.value = obj.sid || "";
         renderQR(payload);
         openModal();
       } catch(e){}

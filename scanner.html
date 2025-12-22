@@ -1,0 +1,627 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 16px; background: #0b0f14; color: #e8eef6; }
+    .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+    .card { background: #121a24; border: 1px solid #223246; border-radius: 14px; padding: 14px; }
+    label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border-radius: 12px; border: 1px solid #2a3a52; background: #0c121b; color: #e8eef6;
+      outline: none;
+    }
+    input:disabled { opacity: .65; cursor: not-allowed; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid #2a3a52; background: #0c121b; color: #e8eef6;
+      border-radius: 12px; padding: 10px 12px; cursor: pointer;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn[disabled] { opacity: .55; cursor: not-allowed; }
+    .btnPrimary { background: #1a2a3f; border-color: #36507a; }
+    .btnDanger  { background: #2a1515; border-color: #6b2b2b; }
+    .btnBigPlus { font-size: 22px; padding: 10px 18px; border-radius: 14px; }
+    .btnSmallMinus { font-size: 14px; padding: 6px 10px; border-radius: 12px; opacity: .95; }
+    .pill { display:inline-flex; gap:10px; align-items:center; padding: 8px 10px; border: 1px solid #2a3a52; border-radius: 999px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .status { display:flex; gap:10px; flex-wrap:wrap; }
+    .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
+
+    .good { color: #8ef0b5; }
+    .warn { color: #ffd37a; }
+    .bad  { color: #ff8a8a; }
+
+    .clubRow { display:flex; gap:12px; align-items:flex-end; flex-wrap: wrap; }
+    .clubRow > .grow { flex: 1 1 320px; }
+    .rowpos { display:flex; gap:10px; align-items:center; padding-bottom: 2px; flex-wrap: wrap; }
+    .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
+    .tiny { font-size: 12px; opacity: .75; }
+
+    .videoWrap {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* Lock visual orientation */
+    .videoWrap video {
+      width: 100%;
+      height: auto;
+      transform-origin: center center;
+      object-fit: cover;
+
+      /* Prevent Safari reflow rotation */
+      will-change: transform;
+    }
+
+    video { width: 100%; display:block; border-radius: 14px; border: 1px solid #223246; background:#000; }
+    #flashOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      mix-blend-mode: screen;
+    }
+    #flashOverlay.ok  { background: rgba(0, 255, 120, 0.40); }
+    #flashOverlay.dup { background: rgba(255, 210, 90, 0.25); }
+    #flashOverlay.err { background: rgba(255, 90, 90, 0.25); }
+
+    .history { margin-top: 10px; border-top: 1px solid #223246; padding-top: 10px; }
+    .historyItem { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border: 1px solid #223246; border-radius: 12px; margin-top: 8px; }
+    .historyLeft { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  </style>
+
+  <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:18px; font-weight:700;">QR Scanner Portal</div>
+        <div class="hint">
+          Operator: <span class="mono" id="operatorTop">Loading…</span> ·
+          Session: <span class="mono" id="sessionTop">—</span>
+        </div>
+        <div class="tiny">Save Club locks the club name and starts camera automatically.</div>
+      </div>
+      <div class="status" id="scanStatus"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="clubRow">
+      <div class="grow">
+        <label>Club</label>
+        <input id="club" placeholder="e.g., Girls Soccer JV">
+      </div>
+
+      <div>
+        <div class="label">Row / Pos</div>
+        <div class="rowpos">
+          <span class="pill"><span>Row</span><span class="mono" id="rowNum">1</span></span>
+          <span class="pill"><span>Pos</span><span class="mono" id="rowPos">0</span></span>
+          <button class="btn btnBigPlus" id="btnPlus" title="Next Row">+</button>
+          <button class="btn btnSmallMinus" id="btnMinus" title="Previous Row">−</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btnPrimary" id="btnSaveClub">Save Club (Lock + Start Camera)</button>
+      <button class="btn btnDanger" id="btnNewClub">New Club / New Session</button>
+    </div>
+    <div class="tiny" style="margin-top:8px;">
+      New Club stops the camera cleanly, resets counters, clears local history, and unlocks club editing.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <div style="font-weight:700;">Camera Scan</div>
+        <div class="hint">Green flash = OK. Yellow flash = duplicate suppressed.</div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btnPrimary" id="btnStartCam">Start Camera</button>
+        <button class="btn" id="btnStopCam">Stop</button>
+      </div>
+    </div>
+
+    <div class="videoWrap">
+      <video id="video" playsinline></video>
+      <div id="flashOverlay" class="ok"></div>
+    </div>
+
+    <div class="history">
+      <div style="font-weight:700;">Recent scans (local)</div>
+      <div class="tiny">Last 10 scans on this device (clears when you start a new club/session).</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;">Manual Entry (Student ID only)</div>
+    <div class="hint">Enter <span class="mono">20xxxxx</span>. Enter submits.</div>
+
+    <div style="margin-top:10px;">
+      <label>StudentID</label>
+      <input id="manualId" class="mono" placeholder="20xxxxx" inputmode="numeric">
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Notes (optional)</label>
+      <input id="notes" placeholder="e.g., retake, name corrected, etc.">
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btnPrimary" id="btnSubmitManual">Log</button>
+      <button class="btn" id="btnClearManual">Clear</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const els = {
+    operatorTop: document.getElementById("operatorTop"),
+    sessionTop: document.getElementById("sessionTop"),
+    scanStatus: document.getElementById("scanStatus"),
+    club: document.getElementById("club"),
+    rowNum: document.getElementById("rowNum"),
+    rowPos: document.getElementById("rowPos"),
+    btnPlus: document.getElementById("btnPlus"),
+    btnMinus: document.getElementById("btnMinus"),
+    btnNewClub: document.getElementById("btnNewClub"),
+    btnSaveClub: document.getElementById("btnSaveClub"),
+    btnStartCam: document.getElementById("btnStartCam"),
+    btnStopCam: document.getElementById("btnStopCam"),
+    video: document.getElementById("video"),
+    flashOverlay: document.getElementById("flashOverlay"),
+    historyList: document.getElementById("historyList"),
+    manualId: document.getElementById("manualId"),
+    notes: document.getElementById("notes"),
+    btnSubmitManual: document.getElementById("btnSubmitManual"),
+    btnClearManual: document.getElementById("btnClearManual"),
+  };
+
+  // ---- flash feedback (priority + lock) ----
+  let flashTimer = null;
+  let flashLockedUntil = 0;
+  let flashLockedKind = ""; // "ok" when OK is active
+
+  function flash(kind) {
+    if (!els.flashOverlay) return;
+
+    const now = Date.now();
+
+    // If OK flash is active, ignore DUP/ERR until it clears
+    if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
+      return;
+    }
+
+    // Reset (Safari-safe)
+    els.flashOverlay.style.opacity = "0";
+    els.flashOverlay.className = "";
+    void els.flashOverlay.offsetHeight;
+
+    els.flashOverlay.classList.add(kind || "ok");
+    els.flashOverlay.style.opacity = "1";
+
+    const duration =
+      kind === "ok"  ? 2500 :
+      kind === "dup" ? 250  :
+      kind === "err" ? 1000  :
+      200;
+
+    // Lock only for OK flashes
+    if (kind === "ok") {
+      flashLockedKind = "ok";
+      flashLockedUntil = now + duration;
+    } else {
+      // allow non-ok to be overwritten freely
+      flashLockedKind = "";
+      flashLockedUntil = 0;
+    }
+
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      els.flashOverlay.style.opacity = "0";
+
+      // Unlock if OK completed
+      if (kind === "ok") {
+        flashLockedKind = "";
+        flashLockedUntil = 0;
+      }
+    }, duration);
+  }
+
+  // ---- local session + counters ----
+  const state = {
+    sessionId: newSessionId(),
+    club: "",
+    clubLocked: false,
+    row: 1,
+    pos: 0
+  };
+
+  function newSessionId() {
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return "SESSION-" + Date.now().toString(36).toUpperCase() + "-" + rand;
+  }
+
+  function renderState() {
+    els.sessionTop.textContent = state.sessionId;
+    els.rowNum.textContent = String(state.row);
+    els.rowPos.textContent = String(state.pos);
+
+    // lock UI
+    els.club.disabled = state.clubLocked;
+    els.btnSaveClub.disabled = state.clubLocked;
+    els.btnStartCam.disabled = !state.clubLocked ? false : els.btnStartCam.disabled; // no-op; keep manual button control elsewhere
+  }
+
+  // ---- UI helpers ----
+  function pill(text, cls="") {
+    const d = document.createElement("div");
+    d.className = `pill mono ${cls}`.trim();
+    d.textContent = text;
+    return d;
+  }
+
+  function showStatus(res) {
+    els.scanStatus.innerHTML = "";
+    if (!res) return;
+    const cls = res.status === "OK" ? "good" : (res.status === "DUPLICATE" ? "warn" : "bad");
+    els.scanStatus.appendChild(pill(`Status: ${res.status}`, cls));
+    if (res.message) els.scanStatus.appendChild(pill(res.message, cls));
+    if (res.student?.studentId) els.scanStatus.appendChild(pill(res.student.studentId));
+  }
+
+  function showScanningClub() {
+    const club = (state.club || "").trim();
+    if (!club) {
+      showStatus({ status: "OK", message: "No club selected. Enter a club and press Save Club." });
+      return;
+    }
+    showStatus({ status: "OK", message: `Scanning club: ${club}` });
+  }
+
+  // ---- history (local) ----
+  const history = [];
+  const HISTORY_MAX = 10;
+
+  function clearHistory() {
+    history.length = 0;
+    renderHistory();
+  }
+
+  function pushHistory(item) {
+    history.unshift(item);
+    while (history.length > HISTORY_MAX) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    els.historyList.innerHTML = "";
+    if (history.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tiny";
+      empty.style.marginTop = "8px";
+      empty.textContent = "No scans yet for this club/session.";
+      els.historyList.appendChild(empty);
+      return;
+    }
+
+    history.forEach(h => {
+      const div = document.createElement("div");
+      div.className = "historyItem";
+
+      const left = document.createElement("div");
+      left.className = "historyLeft";
+
+      const cls = h.status === "OK" ? "good" : (h.status === "DUPLICATE" ? "warn" : "bad");
+      left.appendChild(pill(h.status, cls));
+      left.appendChild(pill(h.id || "—"));
+      left.appendChild(pill(`R${h.row} P${h.pos}`));
+
+      const right = document.createElement("div");
+      right.className = "tiny mono";
+      right.textContent = new Date(h.t).toLocaleTimeString();
+
+      div.appendChild(left);
+      div.appendChild(right);
+      els.historyList.appendChild(div);
+    });
+  }
+
+  // ---- local duplicate suppression (raw QR text) ----
+  let lastRaw = "";
+  let lastAt = 0;
+  const COOLDOWN_MS = 1200;
+  const HARD_SUPPRESS_SAME_AS_PREV = true;
+
+  function resetLocalDuplicateMemory() {
+    lastRaw = "";
+    lastAt = 0;
+  }
+
+  function shouldSendRaw(raw) {
+    const now = Date.now();
+    if (!raw) return false;
+    if (HARD_SUPPRESS_SAME_AS_PREV && raw === lastRaw) return false;
+    if (raw === lastRaw && (now - lastAt) < COOLDOWN_MS) return false;
+    lastRaw = raw;
+    lastAt = now;
+    return true;
+  }
+
+  function extractStudentId(raw) {
+    const s = String(raw || "").trim();
+    if (/^20\d{5}$/.test(s)) return s;
+    try {
+      const o = JSON.parse(s);
+      return String(o.id || o.studentId || o.sid || "").trim();
+    } catch { return ""; }
+  }
+
+  // ---- GAS wrapper ----
+  function gas(fn, args, ok, fail) {
+    if (!window.google || !google.script || !google.script.run) {
+      showStatus({status:"ERROR", message:"google.script.run unavailable. Open the deployed /exec URL in a normal tab."});
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(ok)
+      .withFailureHandler(fail || (err => showStatus({status:"ERROR", message:String(err)})))
+      [fn].apply(null, args);
+  }
+
+  // ---- scanner control (prevents freeze on New Club) ----
+  let scanner = null;
+  let camRunning = false;
+
+  async function startCamera() {
+    if (typeof QrScanner === "undefined") {
+      showStatus({status:"ERROR", message:"qr-scanner failed to load."});
+      return;
+    }
+    QrScanner.WORKER_PATH = "https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js";
+
+    try {
+      await stopCamera(true); // ensure clean start (destroys existing)
+
+      scanner = new QrScanner(
+        els.video,
+        (result) => {
+          const raw = String(result?.data || result || "").trim();
+          if (!raw) return;
+
+          if (!shouldSendRaw(raw)) {
+            flash("dup");
+            showStatus({ status: "DUPLICATE", message: "Duplicate (local suppression) — not sent." });
+            return;
+          }
+
+          logScan(raw, "camera");
+        },
+        {
+          preferredCamera: "environment",
+          maxScansPerSecond: 8,
+
+          // Make the entire video the scan region (prevents displaced region)
+          calculateScanRegion: (video) => {
+            // qr-scanner expects {x, y, width, height}
+            // Full element: start at 0,0 and use the element's displayed size
+            const w = video.videoWidth || video.clientWidth;
+            const h = video.videoHeight || video.clientHeight;
+            return { x: 0, y: 0, width: w, height: h };
+          },
+
+          // Optional: since region is full-frame, these visuals can be distracting
+          highlightScanRegion: false,
+          highlightCodeOutline: false
+        }
+      );
+
+      els.btnStartCam.disabled = true;
+      const old = els.btnStartCam.textContent;
+      els.btnStartCam.textContent = "Starting…";
+      await scanner.start();
+      freezeVideoOrientation();
+      camRunning = true;
+      els.btnStartCam.disabled = false;
+      els.btnStartCam.textContent = old;
+
+      showStatus({status:"OK", message: state.club ? `Camera started. Scanning club: ${state.club}` : "Camera started."});
+    } catch (e) {
+      camRunning = false;
+      els.btnStartCam.disabled = false;
+      els.btnStartCam.textContent = "Start Camera";
+      showStatus({status:"ERROR", message:"Camera failed: " + (e?.message || String(e))});
+    }
+  }
+
+  async function stopCamera(destroy = false) {
+    try {
+      if (scanner) {
+        scanner.stop();
+        camRunning = false;
+
+        if (destroy) {
+          scanner.destroy();
+          scanner = null;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ---- record scan ----
+  function logScan(payload, source) {
+    if (!state.clubLocked || !state.club) {
+      showStatus({ status: "ERROR", message: "Save Club first (locks club + starts camera)." });
+      return;
+    }
+
+    state.pos += 1;
+    renderState();
+
+    const t = Date.now();
+    const studentIdGuess = extractStudentId(payload);
+
+    const btnToBusy = source === "manual" ? els.btnSubmitManual : null;
+    const oldText = btnToBusy ? btnToBusy.textContent : "";
+    if (btnToBusy) { btnToBusy.disabled = true; btnToBusy.textContent = "Saving…"; }
+
+    gas(
+      "recordScan",
+      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, state.pos, state.sessionId],
+      (res) => {
+        if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
+        showStatus(res);
+        if (res?.operator) els.operatorTop.textContent = res.operator;
+
+        if (res?.status === "OK") {
+          flash("ok");
+        } else if (res?.status === "DUPLICATE") {
+          flash("dup");
+        } else if (res?.status === "INVALID_JSON") {
+          // Roll back local position counter
+          state.pos = Math.max(0, state.pos - 1);
+          renderState();
+          flash("err");
+          showStatus({ status: "INVALID_JSON", message: "Invalid QR (ignored, position not advanced)." });
+          return; // do NOT add to history
+        } else if (res?.status) {
+          flash("err");
+        }
+
+        pushHistory({
+          t,
+          id: res?.student?.studentId || studentIdGuess,
+          status: res?.status || "OK",
+          row: state.row,
+          pos: state.pos
+        });
+      },
+      (err) => {
+        if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
+        showStatus({status:"ERROR", message:"Send failed: " + String(err)});
+        flash("err");
+        pushHistory({ t, id: studentIdGuess, status: "SEND_ERROR", row: state.row, pos: state.pos });
+      }
+    );
+  }
+
+  // ---- controls ----
+  els.btnSaveClub.onclick = async () => {
+    const clubText = els.club.value.trim();
+    if (!clubText) {
+      showStatus({ status: "ERROR", message: "Enter a club name first." });
+      return;
+    }
+
+    state.club = clubText;
+    state.clubLocked = true;
+    renderState();
+    showScanningClub();
+
+    // Start camera automatically on save
+    await startCamera();
+  };
+
+  els.btnNewClub.onclick = async () => {
+    const currentClub = (state.club || "").trim();
+    const ok = confirm(
+      currentClub
+        ? `Start a NEW club/session?\n\nThis will clear “${currentClub}”, reset Row/Pos, clear local history, and restart the camera.`
+        : "Start a NEW club/session?\n\nThis will clear the club field, reset Row/Pos, clear local history, and restart the camera."
+    );
+    if (!ok) return;
+
+    const wasRunning = camRunning;
+
+    // Stop + destroy to avoid freeze
+    await stopCamera(true);
+
+    // Reset local state
+    state.sessionId = newSessionId();
+    state.club = "";
+    state.clubLocked = false;
+    els.club.value = "";
+    state.row = 1;
+    state.pos = 0;
+    renderState();
+
+    clearHistory();
+    resetLocalDuplicateMemory();
+
+    showStatus({status:"OK", message:"New club/session started. Enter club name and press Save Club."});
+
+    // If camera was running, restart it (but note: user still needs to Save Club to actually scan)
+    // We restart to avoid the "frozen until refresh" issue and keep camera live.
+    if (wasRunning) {
+      await startCamera();
+      showStatus({status:"OK", message:"Camera restarted. Enter club name and press Save Club."});
+    }
+  };
+
+  els.btnPlus.onclick = () => { state.row = Math.max(1, state.row + 1); state.pos = 0; renderState(); };
+  els.btnMinus.onclick = () => { state.row = Math.max(1, state.row - 1); state.pos = 0; renderState(); };
+
+  // manual
+  function submitManual() {
+    const id = els.manualId.value.trim();
+    if (!/^20\d{5}$/.test(id)) {
+      showStatus({status:"ERROR", message:"Enter a valid StudentID like 20xxxxx."});
+      return;
+    }
+    logScan(id, "manual");
+    els.manualId.focus();
+    els.manualId.select();
+  }
+
+  els.btnSubmitManual.onclick = submitManual;
+  els.btnClearManual.onclick = () => { els.manualId.value = ""; els.notes.value = ""; els.manualId.focus(); };
+  els.manualId.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitManual(); }
+  });
+
+  // manual camera controls still work
+  els.btnStartCam.onclick = startCamera;
+  els.btnStopCam.onclick = async () => {
+    await stopCamera(true);
+    showStatus({status:"OK", message: state.club ? `Camera stopped. Scanning club: ${state.club}` : "Camera stopped."});
+  };
+
+  let lockedAngle = 0;
+
+  function freezeVideoOrientation() {
+    els.video.style.transform = "rotate(0deg)";
+  }
+
+  // Run once when camera starts
+  // and again if orientation changes
+  window.addEventListener("orientationchange", () => {
+    freezeVideoOrientation();
+  });
+
+  // init
+  renderState();
+  clearHistory();
+  showStatus({status:"OK", message:"Enter a club name, then press Save Club (locks + starts camera)."});
+  gas("setupYearbookScannerSheets", [], () => { gas("getClientConfig", [], () => {}); });
+</script>
+</body>
+</html>
