@@ -205,6 +205,26 @@
     const modalQRImg = document.getElementById("modalQRImg");
     const warnText = document.getElementById("warnText");
 
+    // double-confirm actions (prevents accidental close/clear)
+    let closeArmed = false;
+    let clearArmed = false;
+    let armTimer = null;
+
+    function arm(kind){
+      closeArmed = (kind === "close");
+      clearArmed = (kind === "clear");
+      warnText.textContent = kind === "close"
+        ? "Tap Close again to confirm."
+        : "Tap Clear again to confirm.";
+      if (armTimer) clearTimeout(armTimer);
+      armTimer = setTimeout(()=>{
+        closeArmed = false;
+        clearArmed = false;
+        warnText.textContent = "";
+        armTimer = null;
+      }, 2500);
+    }
+
     const COOKIE = "bmc_last_qr_payload";
 
     function setError(msg){
@@ -234,7 +254,6 @@
       });
     }
 
-
     function renderQR(payload){
       const tmp = document.createElement("div");
       document.body.appendChild(tmp);
@@ -244,7 +263,14 @@
       tmp.remove();
     }
 
-    function openModal(){ modal.setAttribute("aria-hidden","false"); }
+    function openModal(){
+      // modal is intentionally not dismissable without double-confirm actions
+      closeArmed = false;
+      clearArmed = false;
+      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      warnText.textContent = "";
+      modal.setAttribute("aria-hidden","false");
+    }
     function closeModal(){ modal.setAttribute("aria-hidden","true"); }
 
     document.getElementById("generate").onclick = ()=>{
@@ -262,19 +288,38 @@
       document.cookie = COOKIE+"=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
     };
 
-    document.getElementById("modalClose").onclick = closeModal;
+    document.getElementById("modalClose").onclick = ()=>{
+      if (!closeArmed) { arm("close"); return; }
+      closeArmed = false;
+      warnText.textContent = "";
+      closeModal();
+    };
+
     document.getElementById("modalClear").onclick = ()=>{
+      if (!clearArmed) { arm("clear"); return; }
+      clearArmed = false;
+      warnText.textContent = "";
       document.getElementById("clear").click();
       closeModal();
     };
 
     sidEl.addEventListener("input", validateSid);
 
+    // Prevent Escape key from dismissing the modal (students should not accidentally close it)
+    window.addEventListener("keydown",(e)=>{
+      if (e.key !== "Escape") return;
+      if (modal.getAttribute("aria-hidden") === "false") {
+        e.preventDefault();
+        arm("close");
+      }
+    });
+
     window.addEventListener("load",()=>{
       const match = document.cookie.match(/bmc_last_qr_payload=([^;]+)/);
       if (!match) return;
       const payload = decodeURIComponent(match[1]);
       try {
+        const obj = JSON.parse(payload);
         firstEl.value = obj.f || "";
         lastEl.value = obj.l || "";
         sidEl.value = obj.sid || "";
