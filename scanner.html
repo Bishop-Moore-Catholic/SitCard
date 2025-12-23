@@ -65,8 +65,6 @@
     height: auto;
     transform-origin: center center;
     object-fit: cover;
-
-    /* Prevent Safari reflow rotation */
     will-change: transform;
   }
 
@@ -99,7 +97,6 @@
   }
   select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
 </style>
-
 
   <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
 </head>
@@ -227,54 +224,54 @@
   let flashLockedKind = ""; // "ok" when OK is active
 
   function flash(kind) {
-  if (!els.flashOverlay) return;
+    if (!els.flashOverlay) return;
 
-  const now = Date.now();
+    const now = Date.now();
 
-  // If OK flash is active, ignore DUP/ERR until it clears
-  if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
-    return;
-  }
+    // If OK flash is active, ignore DUP/ERR until it clears
+    if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
+      return;
+    }
 
-  // Reset overlay (Safari-safe)
-  els.flashOverlay.style.opacity = "0";
-  els.flashOverlay.className = "";
-  void els.flashOverlay.offsetHeight;
-
-  els.flashOverlay.classList.add(kind || "ok");
-  els.flashOverlay.style.opacity = "1";
-
-  const duration =
-    kind === "ok"  ? 1500 :
-    kind === "dup" ? 250  :
-    kind === "err" ? 1000 :
-    200;
-
-  // === PAGE BACKGROUND FLASH (OK ONLY) ===
-  if (kind === "ok") {
-    document.body.classList.add("bg-ok");
-  }
-
-  // Lock only for OK flashes
-  if (kind === "ok") {
-    flashLockedKind = "ok";
-    flashLockedUntil = now + duration;
-  } else {
-    flashLockedKind = "";
-    flashLockedUntil = 0;
-  }
-
-  clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => {
+    // Reset overlay (Safari-safe)
     els.flashOverlay.style.opacity = "0";
+    els.flashOverlay.className = "";
+    void els.flashOverlay.offsetHeight;
 
+    els.flashOverlay.classList.add(kind || "ok");
+    els.flashOverlay.style.opacity = "1";
+
+    const duration =
+      kind === "ok"  ? 1500 :
+      kind === "dup" ? 250  :
+      kind === "err" ? 1000 :
+      200;
+
+    // === PAGE BACKGROUND FLASH (OK ONLY) ===
     if (kind === "ok") {
-      document.body.classList.remove("bg-ok");
+      document.body.classList.add("bg-ok");
+    }
+
+    // Lock only for OK flashes
+    if (kind === "ok") {
+      flashLockedKind = "ok";
+      flashLockedUntil = now + duration;
+    } else {
       flashLockedKind = "";
       flashLockedUntil = 0;
     }
-  }, duration);
-}
+
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      els.flashOverlay.style.opacity = "0";
+
+      if (kind === "ok") {
+        document.body.classList.remove("bg-ok");
+        flashLockedKind = "";
+        flashLockedUntil = 0;
+      }
+    }, duration);
+  }
 
   // ---- local session + counters ----
   const state = {
@@ -312,7 +309,13 @@
   function showStatus(res) {
     els.scanStatus.innerHTML = "";
     if (!res) return;
-    const cls = res.status === "OK" ? "good" : (res.status === "DUPLICATE" ? "warn" : "bad");
+
+    const s = String(res.status || "").toUpperCase();
+    const cls =
+      (s === "OK") ? "good" :
+      (s.startsWith("DUPLICATE") || s === "QUEUED") ? "warn" :
+      "bad";
+
     els.scanStatus.appendChild(pill(`Status: ${res.status}`, cls));
     if (res.message) els.scanStatus.appendChild(pill(res.message, cls));
     if (res.student?.studentId) els.scanStatus.appendChild(pill(res.student.studentId));
@@ -342,6 +345,14 @@
     renderHistory();
   }
 
+  function updateHistoryStatus(hid, newStatus, newId) {
+    const h = history.find(x => x && x._hid === hid);
+    if (!h) return;
+    h.status = newStatus;
+    if (newId) h.id = newId;
+    renderHistory();
+  }
+
   function renderHistory() {
     els.historyList.innerHTML = "";
     if (history.length === 0) {
@@ -360,7 +371,12 @@
       const left = document.createElement("div");
       left.className = "historyLeft";
 
-      const cls = h.status === "OK" ? "good" : (h.status === "DUPLICATE" ? "warn" : "bad");
+      const s = String(h.status || "").toUpperCase();
+      const cls =
+        (s === "OK") ? "good" :
+        (s.startsWith("DUPLICATE") || s === "QUEUED") ? "warn" :
+        "bad";
+
       left.appendChild(pill(h.status, cls));
       left.appendChild(pill(h.id || "—"));
       left.appendChild(pill(`R${h.row} P${h.pos}`));
@@ -425,7 +441,6 @@
     return (grade >= 9 && grade <= 12) ? grade : null;
   }
 
-
   // ---- GAS wrapper ----
   function gas(fn, args, ok, fail) {
     if (!window.google || !google.script || !google.script.run) {
@@ -436,6 +451,86 @@
       .withSuccessHandler(ok)
       .withFailureHandler(fail || (err => showStatus({status:"ERROR", message:String(err)})))
       [fn].apply(null, args);
+  }
+
+  // ---- async send queue (non-blocking scanner) ----
+  const SENDQ_KEY = "yearbook.scanSendQueue.v1";
+  let sendQueue = [];
+  let isFlushing = false;
+
+  function loadSendQueue() {
+    try {
+      const raw = localStorage.getItem(SENDQ_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      sendQueue = Array.isArray(arr) ? arr : [];
+    } catch {
+      sendQueue = [];
+    }
+  }
+
+  function saveSendQueue() {
+    try { localStorage.setItem(SENDQ_KEY, JSON.stringify(sendQueue)); } catch {}
+  }
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  function enqueueSend(item) {
+    // item can include onResult; JSON stringify will drop it, so we persist only payload fields
+    sendQueue.push(item);
+    saveSendQueue();
+    flushSendQueue();
+  }
+
+  async function flushSendQueue() {
+    if (isFlushing) return;
+    isFlushing = true;
+
+    try {
+      while (sendQueue.length) {
+        const item = sendQueue[0];
+
+        const res = await new Promise((resolve, reject) => {
+          gas(
+            "recordScan",
+            [
+              String(item.payload).trim(),
+              item.club,
+              item.notes || "",
+              item.row,
+              item.pos,
+              item.sessionId,
+              item.gradYear,
+              item.grade
+            ],
+            resolve,
+            reject
+          );
+        });
+
+        if (typeof item.onResult === "function") {
+          try { item.onResult(res); } catch {}
+        }
+
+        sendQueue.shift();
+        saveSendQueue();
+
+        await sleep(150); // throttle
+      }
+    } catch (err) {
+      console.warn("Queue flush failed; will retry.", err);
+      // leave queue intact, retry later
+      await sleep(1200);
+    } finally {
+      isFlushing = false;
+      if (sendQueue.length) flushSendQueue();
+    }
+  }
+
+  // ---- per-session dedupe by studentId (prevents dup increment + dup sends) ----
+  const seenThisSession = new Set();
+  function resetSeenThisSession() { seenThisSession.clear(); }
+  function makeSeenKey(studentId) {
+    return `${state.club}|${state.sessionId}|${String(studentId || "").trim()}`;
   }
 
   // ---- scanner control (prevents freeze on New Club) ----
@@ -477,7 +572,6 @@
       els.camSelect.value = pick;
       selectedCameraId = pick;
     } catch (e) {
-      // If permissions not granted yet, we may not get labels. Still try again after start.
       els.camSelect.innerHTML = "";
       const opt = document.createElement("option");
       opt.value = "";
@@ -487,7 +581,6 @@
       selectedCameraId = "";
     }
   }
-
 
   async function startCamera() {
     if (typeof QrScanner === "undefined") {
@@ -499,7 +592,6 @@
     try {
       await stopCamera(true); // ensure clean start (destroys existing)
 
-      // Refresh camera list (labels available after permission on some browsers)
       await refreshCameras(false);
       selectedCameraId = els.camSelect && !els.camSelect.disabled ? (els.camSelect.value || selectedCameraId) : selectedCameraId;
 
@@ -511,7 +603,8 @@
 
           if (!shouldSendRaw(raw)) {
             flash("dup");
-            showStatus({ status: "DUPLICATE", message: "Duplicate (local suppression) — not sent." });
+            showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (local suppression) — not sent." });
+            pushHistory({ t: Date.now(), id: extractStudentId(raw), status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
             return;
           }
 
@@ -520,17 +613,11 @@
         {
           preferredCamera: (selectedCameraId || "environment"),
           maxScansPerSecond: 15,
-
-          // Make the entire video the scan region (prevents displaced region)
           calculateScanRegion: (video) => {
-            // qr-scanner expects {x, y, width, height}
-            // Full element: start at 0,0 and use the element's displayed size
             const w = video.videoWidth || video.clientWidth;
             const h = video.videoHeight || video.clientHeight;
             return { x: 0, y: 0, width: w, height: h };
           },
-
-          // Optional: since region is full-frame, these visuals can be distracting
           highlightScanRegion: true,
           highlightCodeOutline: true
         }
@@ -565,12 +652,10 @@
           scanner = null;
         }
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
-  // ---- record scan ----
+  // ---- record scan (ASYNC / QUEUED) ----
   function logScan(payload, source) {
     if (!state.clubLocked || !state.club) {
       showStatus({ status: "ERROR", message: "Save Club first (locks club + starts camera)." });
@@ -578,60 +663,80 @@
     }
 
     const t = Date.now();
-    const studentIdGuess = extractStudentId(payload);
-
-    // Propose next position, but DO NOT commit yet
-    const proposedPos = state.pos + 1;
-
-    // (Optional) If you want the UI to show "pending" you can temporarily display it,
-    // but simplest is to keep the UI unchanged until OK.
+    const raw = String(payload || "").trim();
+    const studentIdGuess = extractStudentId(raw);
     const gradYear = inferGradYearFromSid(studentIdGuess);
     const grade = inferGradeFromGradYear(gradYear);
 
-    const btnToBusy = source === "manual" ? els.btnSubmitManual : null;
-    const oldText = btnToBusy ? btnToBusy.textContent : "";
-    if (btnToBusy) { btnToBusy.disabled = true; btnToBusy.textContent = "Saving…"; }
+    if (!studentIdGuess) {
+      flash("err");
+      showStatus({ status: "INVALID_JSON", message: "Invalid QR (no StudentID detected) — not queued." });
+      pushHistory({ t, id: "—", status: "INVALID_JSON", row: state.row, pos: state.pos });
+      return;
+    }
 
-    gas(
-      "recordScan",
-      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, proposedPos, state.sessionId, gradYear, grade],
-      (res) => {
-        if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
-        showStatus(res);
+    // Hard local dedupe by studentId for this session so position doesn't increment
+    const key = makeSeenKey(studentIdGuess);
+    if (seenThisSession.has(key)) {
+      flash("dup");
+      showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (same student already scanned this session) — not queued." });
+      pushHistory({ t, id: studentIdGuess, status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
+      return;
+    }
+
+    // Commit immediately (non-blocking)
+    const committedPos = state.pos + 1;
+    state.pos = committedPos;
+    seenThisSession.add(key);
+    renderState();
+
+    flash("ok");
+    showStatus({ status: "QUEUED", message: "Queued… sending in background." });
+
+    const historyId = `${t}-${studentIdGuess}-${committedPos}`;
+    pushHistory({
+      t,
+      id: studentIdGuess,
+      status: "QUEUED",
+      row: state.row,
+      pos: committedPos,
+      _hid: historyId
+    });
+
+    // Manual button no longer needs to wait on server
+    if (source === "manual") {
+      els.btnSubmitManual.disabled = false;
+      els.btnSubmitManual.textContent = "Log";
+    }
+
+    enqueueSend({
+      payload: raw,
+      club: state.club,
+      notes: els.notes.value.trim(),
+      row: state.row,
+      pos: committedPos,
+      sessionId: state.sessionId,
+      gradYear,
+      grade,
+      onResult: (res) => {
         if (res?.operator) els.operatorTop.textContent = res.operator;
 
+        // Update the existing history entry with server status
         if (res?.status === "OK") {
-          state.pos = proposedPos;   // ✅ commit
-          renderState();
-          flash("ok");
+          updateHistoryStatus(historyId, "OK", res?.student?.studentId || studentIdGuess);
+          // optional: showStatus(res); // keep latest server message if you want
         } else if (res?.status === "DUPLICATE") {
-          // ✅ do NOT commit
-          flash("dup");
+          updateHistoryStatus(historyId, "DUPLICATE_SERVER", res?.student?.studentId || studentIdGuess);
+          // optional: flash("dup");
         } else if (res?.status === "INVALID_JSON") {
-          // ✅ do NOT commit
-          flash("err");
-          showStatus({ status: "INVALID_JSON", message: "Invalid QR (ignored, position not advanced)." });
-          return; // do NOT add to history
+          updateHistoryStatus(historyId, "INVALID_JSON_SERVER", studentIdGuess);
         } else if (res?.status) {
-          flash("err");
+          updateHistoryStatus(historyId, String(res.status), studentIdGuess);
+        } else {
+          updateHistoryStatus(historyId, "ERROR", studentIdGuess);
         }
-
-
-        pushHistory({
-          t,
-          id: res?.student?.studentId || studentIdGuess,
-          status: res?.status || "OK",
-          row: state.row,
-          pos: (res?.status === "OK") ? proposedPos : state.pos
-        });
-      },
-      (err) => {
-        if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
-        showStatus({status:"ERROR", message:"Send failed: " + String(err)});
-        flash("err");
-        pushHistory({ t, id: studentIdGuess, status: "SEND_ERROR", row: state.row, pos: state.pos });
       }
-    );
+    });
   }
 
   // ---- controls ----
@@ -644,10 +749,13 @@
 
     state.club = clubText;
     state.clubLocked = true;
+
+    // New session scope dedupe should be clean when club changes / session starts
+    resetSeenThisSession();
+
     renderState();
     showScanningClub();
 
-    // Start camera automatically on save
     await startCamera();
   };
 
@@ -662,10 +770,8 @@
 
     const wasRunning = camRunning;
 
-    // Stop + destroy to avoid freeze
     await stopCamera(true);
 
-    // Reset local state
     state.sessionId = newSessionId();
     state.club = "";
     state.clubLocked = false;
@@ -676,11 +782,10 @@
 
     clearHistory();
     resetLocalDuplicateMemory();
+    resetSeenThisSession();
 
     showStatus({status:"OK", message:"New club/session started. Enter club name and press Save Club."});
 
-    // If camera was running, restart it (but note: user still needs to Save Club to actually scan)
-    // We restart to avoid the "frozen until refresh" issue and keep camera live.
     if (wasRunning) {
       await startCamera();
       showStatus({status:"OK", message:"Camera restarted. Enter club name and press Save Club."});
@@ -708,25 +813,19 @@
     if (e.key === "Enter") { e.preventDefault(); submitManual(); }
   });
 
-  // manual camera controls still work
   els.btnStartCam.onclick = startCamera;
   els.btnStopCam.onclick = async () => {
     await stopCamera(true);
     showStatus({status:"OK", message: state.club ? `Camera stopped. Scanning club: ${state.club}` : "Camera stopped."});
   };
 
-  let lockedAngle = 0;
-
   function freezeVideoOrientation() {
     els.video.style.transform = "rotate(0deg)";
   }
 
-  // Run once when camera starts
-  // and again if orientation changes
   window.addEventListener("orientationchange", () => {
     freezeVideoOrientation();
   });
-
 
   // camera source controls
   els.btnRefreshCams.onclick = async () => {
@@ -737,7 +836,6 @@
   els.camSelect.onchange = async () => {
     selectedCameraId = els.camSelect.value || "";
     if (camRunning) {
-      // Restart camera on new source
       await startCamera();
       showStatus({status:"OK", message: state.club ? `Camera switched. Scanning club: ${state.club}` : "Camera switched."});
     } else {
@@ -748,6 +846,10 @@
   // init
   renderState();
   clearHistory();
+  loadSendQueue();
+  flushSendQueue();
+  setInterval(flushSendQueue, 2000);
+
   refreshCameras(true);
   showStatus({status:"OK", message:"Enter a club name, then press Save Club (locks + starts camera)."});
   gas("setupYearbookScannerSheets", [], () => { gas("getClientConfig", [], () => {}); });
