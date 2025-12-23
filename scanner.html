@@ -519,7 +519,7 @@
         },
         {
           preferredCamera: (selectedCameraId || "environment"),
-          maxScansPerSecond: 8,
+          maxScansPerSecond: 15,
 
           // Make the entire video the scan region (prevents displaced region)
           calculateScanRegion: (video) => {
@@ -577,11 +577,14 @@
       return;
     }
 
-    state.pos += 1;
-    renderState();
-
     const t = Date.now();
     const studentIdGuess = extractStudentId(payload);
+
+    // Propose next position, but DO NOT commit yet
+    const proposedPos = state.pos + 1;
+
+    // (Optional) If you want the UI to show "pending" you can temporarily display it,
+    // but simplest is to keep the UI unchanged until OK.
     const gradYear = inferGradYearFromSid(studentIdGuess);
     const grade = inferGradeFromGradYear(gradYear);
 
@@ -591,20 +594,21 @@
 
     gas(
       "recordScan",
-      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, state.pos, state.sessionId, gradYear, grade],
+      [String(payload).trim(), state.club, els.notes.value.trim(), state.row, proposedPos, state.sessionId, gradYear, grade],
       (res) => {
         if (btnToBusy) { btnToBusy.disabled = false; btnToBusy.textContent = oldText; }
         showStatus(res);
         if (res?.operator) els.operatorTop.textContent = res.operator;
 
         if (res?.status === "OK") {
+          state.pos = proposedPos;   // ✅ commit
+          renderState();
           flash("ok");
         } else if (res?.status === "DUPLICATE") {
+          // ✅ do NOT commit
           flash("dup");
         } else if (res?.status === "INVALID_JSON") {
-          // Roll back local position counter
-          state.pos = Math.max(0, state.pos - 1);
-          renderState();
+          // ✅ do NOT commit
           flash("err");
           showStatus({ status: "INVALID_JSON", message: "Invalid QR (ignored, position not advanced)." });
           return; // do NOT add to history
@@ -612,12 +616,13 @@
           flash("err");
         }
 
+
         pushHistory({
           t,
           id: res?.student?.studentId || studentIdGuess,
           status: res?.status || "OK",
           row: state.row,
-          pos: state.pos
+          pos: (res?.status === "OK") ? proposedPos : state.pos
         });
       },
       (err) => {
