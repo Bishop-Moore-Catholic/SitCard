@@ -604,7 +604,7 @@
           if (!shouldSendRaw(raw)) {
             flash("dup");
             showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (local suppression) — not sent." });
-            pushHistory({ t: Date.now(), id: extractStudentId(raw), status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
+            // pushHistory({ t: Date.now(), id: extractStudentId(raw), status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
             return;
           }
 
@@ -671,7 +671,7 @@
     if (!studentIdGuess) {
       flash("err");
       showStatus({ status: "INVALID_JSON", message: "Invalid QR (no StudentID detected) — not queued." });
-      pushHistory({ t, id: "—", status: "INVALID_JSON", row: state.row, pos: state.pos });
+      // pushHistory({ t, id: "—", status: "INVALID_JSON", row: state.row, pos: state.pos });
       return;
     }
 
@@ -680,7 +680,7 @@
     if (seenThisSession.has(key)) {
       flash("dup");
       showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (same student already scanned this session) — not queued." });
-      pushHistory({ t, id: studentIdGuess, status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
+      // pushHistory({ t, id: studentIdGuess, status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
       return;
     }
 
@@ -726,10 +726,10 @@
           updateHistoryStatus(historyId, "OK", res?.student?.studentId || studentIdGuess);
           // optional: showStatus(res); // keep latest server message if you want
         } else if (res?.status === "DUPLICATE") {
-          updateHistoryStatus(historyId, "DUPLICATE_SERVER", res?.student?.studentId || studentIdGuess);
+          // updateHistoryStatus(historyId, "DUPLICATE_SERVER", res?.student?.studentId || studentIdGuess);
           // optional: flash("dup");
         } else if (res?.status === "INVALID_JSON") {
-          updateHistoryStatus(historyId, "INVALID_JSON_SERVER", studentIdGuess);
+          // updateHistoryStatus(historyId, "INVALID_JSON_SERVER", studentIdGuess);
         } else if (res?.status) {
           updateHistoryStatus(historyId, String(res.status), studentIdGuess);
         } else {
