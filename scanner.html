@@ -4,91 +4,102 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { margin: 0; padding: 16px; background: #0b0f14; color: #e8eef6; }
-    .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
-    .card { background: #121a24; border: 1px solid #223246; border-radius: 14px; padding: 14px; }
-    label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
-    input {
-      width: 100%; box-sizing: border-box; padding: 10px 12px;
-      border-radius: 12px; border: 1px solid #2a3a52; background: #0c121b; color: #e8eef6;
-      outline: none;
-    }
-    input:disabled { opacity: .65; cursor: not-allowed; }
-    .toolbar { display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
-    .btn {
-      border: 1px solid #2a3a52; background: #0c121b; color: #e8eef6;
-      border-radius: 12px; padding: 10px 12px; cursor: pointer;
-    }
-    .btn:active { transform: translateY(1px); }
-    .btn[disabled] { opacity: .55; cursor: not-allowed; }
-    .btnPrimary { background: #1a2a3f; border-color: #36507a; }
-    .btnDanger  { background: #2a1515; border-color: #6b2b2b; }
-    .btnBigPlus { font-size: 22px; padding: 10px 18px; border-radius: 14px; }
-    .btnSmallMinus { font-size: 14px; padding: 6px 10px; border-radius: 12px; opacity: .95; }
-    .pill { display:inline-flex; gap:10px; align-items:center; padding: 8px 10px; border: 1px solid #2a3a52; border-radius: 999px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-    .status { display:flex; gap:10px; flex-wrap:wrap; }
-    .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
+<style>
+  :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  body {
+    margin: 0;
+    padding: 16px;
+    background: #f6f8fb;
+    transition: background-color 180ms ease
+  }
 
-    .good { color: #8ef0b5; }
-    .warn { color: #ffd37a; }
-    .bad  { color: #ff8a8a; }
+  /* OK background flash */
+  body.bg-ok {
+    background-color: #00e36a; /* subtle green */
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+  .card { background: #ffffff; border: 1px solid #d7e0ee; border-radius: 14px; padding: 14px; }
+  label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
+  input {
+    width: 100%; box-sizing: border-box; padding: 10px 12px;
+    border-radius: 12px; border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
+    outline: none;
+  }
+  input:disabled { opacity: .65; cursor: not-allowed; }
+  .toolbar { display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
+    border-radius: 12px; padding: 10px 12px; cursor: pointer;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled] { opacity: .55; cursor: not-allowed; }
+  .btnPrimary { background: #eaf2ff; border-color: #8fb3ff; }
+  .btnDanger  { background: #feecec; border-color: #f2a3a3; }
+  .btnBigPlus { font-size: 22px; padding: 10px 18px; border-radius: 14px; }
+  .btnSmallMinus { font-size: 14px; padding: 6px 10px; border-radius: 12px; opacity: .95; }
+  .pill { display:inline-flex; gap:10px; align-items:center; padding: 8px 10px; border: 1px solid #c6d2e6; border-radius: 999px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .status { display:flex; gap:10px; flex-wrap:wrap; }
+  .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
 
-    .clubRow { display:flex; gap:12px; align-items:flex-end; flex-wrap: wrap; }
-    .clubRow > .grow { flex: 1 1 320px; }
-    .rowpos { display:flex; gap:10px; align-items:center; padding-bottom: 2px; flex-wrap: wrap; }
-    .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
-    .tiny { font-size: 12px; opacity: .75; }
+  .good { color: #0f8a4c; }
+  .warn { color: #b45309; }
+  .bad  { color: #b91c1c; }
 
-    .videoWrap {
-      position: relative;
-      border-radius: 14px;
-      overflow: hidden;
-      background: #000;
-    }
+  .clubRow { display:flex; gap:12px; align-items:flex-end; flex-wrap: wrap; }
+  .clubRow > .grow { flex: 1 1 320px; }
+  .rowpos { display:flex; gap:10px; align-items:center; padding-bottom: 2px; flex-wrap: wrap; }
+  .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
+  .tiny { font-size: 12px; opacity: .75; }
 
-    /* Lock visual orientation */
-    .videoWrap video {
-      width: 100%;
-      height: auto;
-      transform-origin: center center;
-      object-fit: cover;
+  .videoWrap {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+  }
 
-      /* Prevent Safari reflow rotation */
-      will-change: transform;
-    }
+  /* Lock visual orientation */
+  .videoWrap video {
+    width: 100%;
+    height: auto;
+    transform-origin: center center;
+    object-fit: cover;
 
-    video { width: 100%; display:block; border-radius: 14px; border: 1px solid #223246; background:#000; }
-    #flashOverlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 120ms ease;
-      mix-blend-mode: screen;
-    }
-    #flashOverlay.ok  { background: rgba(0, 255, 140, 0.80); }
-    #flashOverlay.dup { background: rgba(255, 180, 90, 0.35); }
-    #flashOverlay.err { background: rgba(255, 90, 90, 0.25); }
-    .scan-region-highlight-svg {display: none!important;}
+    /* Prevent Safari reflow rotation */
+    will-change: transform;
+  }
 
-    .history { margin-top: 10px; border-top: 1px solid #223246; padding-top: 10px; }
-    .historyItem { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border: 1px solid #223246; border-radius: 12px; margin-top: 8px; }
-    .historyLeft { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  
-    select.camSelect{
-      border: 1px solid #2a3a52;
-      background: #0c121b;
-      color: #e8eef6;
-      border-radius: 12px;
-      padding: 10px 12px;
-      cursor: pointer;
-      max-width: 280px;
-    }
-    select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
+  video { width: 100%; display:block; border-radius: 14px; border: 1px solid #d7e0ee; background:#000; }
+  #flashOverlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms ease;
+    mix-blend-mode: screen;
+  }
+  #flashOverlay.ok  { background: rgba(34, 197, 94, 0.80); }
+  #flashOverlay.dup { background: rgba(245, 158, 11, 0.40); }
+  #flashOverlay.err { background: rgba(239, 68, 68, 0.40); }
+  .scan-region-highlight-svg {display: none!important;}
+
+  .history { margin-top: 10px; border-top: 1px solid #d7e0ee; padding-top: 10px; }
+  .historyItem { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border: 1px solid #d7e0ee; border-radius: 12px; margin-top: 8px; }
+  .historyLeft { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  select.camSelect{
+    border: 1px solid #c6d2e6;
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    max-width: 280px;
+  }
+  select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
 </style>
+
 
   <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
 </head>
@@ -216,50 +227,54 @@
   let flashLockedKind = ""; // "ok" when OK is active
 
   function flash(kind) {
-    if (!els.flashOverlay) return;
+  if (!els.flashOverlay) return;
 
-    const now = Date.now();
+  const now = Date.now();
 
-    // If OK flash is active, ignore DUP/ERR until it clears
-    if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
-      return;
-    }
+  // If OK flash is active, ignore DUP/ERR until it clears
+  if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
+    return;
+  }
 
-    // Reset (Safari-safe)
+  // Reset overlay (Safari-safe)
+  els.flashOverlay.style.opacity = "0";
+  els.flashOverlay.className = "";
+  void els.flashOverlay.offsetHeight;
+
+  els.flashOverlay.classList.add(kind || "ok");
+  els.flashOverlay.style.opacity = "1";
+
+  const duration =
+    kind === "ok"  ? 1500 :
+    kind === "dup" ? 250  :
+    kind === "err" ? 1000 :
+    200;
+
+  // === PAGE BACKGROUND FLASH (OK ONLY) ===
+  if (kind === "ok") {
+    document.body.classList.add("bg-ok");
+  }
+
+  // Lock only for OK flashes
+  if (kind === "ok") {
+    flashLockedKind = "ok";
+    flashLockedUntil = now + duration;
+  } else {
+    flashLockedKind = "";
+    flashLockedUntil = 0;
+  }
+
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
     els.flashOverlay.style.opacity = "0";
-    els.flashOverlay.className = "";
-    void els.flashOverlay.offsetHeight;
 
-    els.flashOverlay.classList.add(kind || "ok");
-    els.flashOverlay.style.opacity = "1";
-
-    const duration =
-      kind === "ok"  ? 2500 :
-      kind === "dup" ? 250  :
-      kind === "err" ? 1000  :
-      200;
-
-    // Lock only for OK flashes
     if (kind === "ok") {
-      flashLockedKind = "ok";
-      flashLockedUntil = now + duration;
-    } else {
-      // allow non-ok to be overwritten freely
+      document.body.classList.remove("bg-ok");
       flashLockedKind = "";
       flashLockedUntil = 0;
     }
-
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => {
-      els.flashOverlay.style.opacity = "0";
-
-      // Unlock if OK completed
-      if (kind === "ok") {
-        flashLockedKind = "";
-        flashLockedUntil = 0;
-      }
-    }, duration);
-  }
+  }, duration);
+}
 
   // ---- local session + counters ----
   const state = {
