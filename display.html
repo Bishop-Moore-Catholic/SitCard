@@ -248,18 +248,25 @@
     .muted{ color: var(--muted); }
     .err{ color: #b91c1c; }
 
-    /* Fullscreen video modal overlay */
+    /* Fullscreen video modal overlay (fade in/out) */
     .videoModal{
       position: fixed;
       inset: 0;
       z-index: 9999;
       background: #000;
-      display: none;
+
+      /* keep it mounted so opacity can animate */
+      display: grid;
+      place-items: center;
+
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 500ms ease;
     }
 
     .videoModal.show{
-      display: grid;
-      place-items: center;
+      opacity: 1;
+      pointer-events: auto;
     }
 
     .videoModalInner{
@@ -270,7 +277,7 @@
     .videoModal video{
       width: 100%;
       height: 100%;
-      object-fit: cover; /* fill screen like a TV bumper */
+      object-fit: cover; /* change to contain if you want no cropping */
       background: #000;
     }
   </style>
@@ -370,6 +377,12 @@
 
     tickerTrack: document.getElementById('tickerTrack'),
   };
+
+  function getQueryParam(name){
+    const url = new URL(window.location.href);
+    return url.searchParams.get(name);
+}
+
 
   function pad2(n){ return String(n).padStart(2,'0'); }
 
@@ -625,26 +638,33 @@
   })();
 
   // ---- Instructions Video Modal (plays once per minute) ----
-  const INSTRUCTIONS_VIDEO_URL =
-    "https://github.com/Bishop-Moore-Catholic/SitCard/raw/refs/heads/main/Instructions.mp4";
+  const INSTRUCTIONS_VIDEO_URL = "https://github.com/Bishop-Moore-Catholic/SitCard/raw/refs/heads/main/Instructions.mp4";
 
-  // Play once per minute:
   const INSTRUCTIONS_INTERVAL_MS = 60_000;
-
-  // Small delay after page load before first run (optional safety)
   const INSTRUCTIONS_FIRST_DELAY_MS = 15_000;
+
+  // fade timings (match CSS transition)
+  const VIDEO_FADE_MS = 500;
 
   let isVideoPlaying = false;
   let lastVideoStart = 0;
 
   function setupInstructionsVideo(){
+    // URL flag: ?video=0 disables the overlay
+    const videoFlag = getQueryParam("video");
+    if (videoFlag === "0") {
+      console.log("Video overlay disabled via ?video=0");
+      return;
+    }
+
     const modal = document.getElementById("videoModal");
     const video = document.getElementById("instructionVideo");
     if (!modal || !video) return;
 
-    // Ensure correct source (in case HTML was edited)
-    if (video.currentSrc === "" && video.querySelector("source")){
-      video.querySelector("source").src = INSTRUCTIONS_VIDEO_URL;
+    // Ensure correct source
+    const srcEl = video.querySelector("source");
+    if (srcEl && srcEl.src !== INSTRUCTIONS_VIDEO_URL) {
+      srcEl.src = INSTRUCTIONS_VIDEO_URL;
       video.load();
     }
 
@@ -659,23 +679,27 @@
     }
 
     function stopAndHide(){
-      try {
-        video.pause();
-        video.currentTime = 0;
-      } catch (_) {}
+      try { video.pause(); } catch (_) {}
+
+      // Fade out first, then reset time so it doesn't flash the first frame
       hideModal();
-      isVideoPlaying = false;
+      setTimeout(() => {
+        try { video.currentTime = 0; } catch (_) {}
+        isVideoPlaying = false;
+      }, VIDEO_FADE_MS);
     }
 
     async function playOnce(){
-      // Prevent stacking / over-triggering
       const now = Date.now();
       if (isVideoPlaying) return;
-      if (now - lastVideoStart < 30_000) return; // hard guard (video is 33s)
+
+      // Guard so it can’t re-trigger while finishing
+      if (now - lastVideoStart < 35_000) return; // video ~33s
 
       isVideoPlaying = true;
       lastVideoStart = now;
 
+      // Start hidden -> fade in
       showModal();
 
       try {
@@ -683,40 +707,36 @@
         video.pause();
         video.currentTime = 0;
 
-        // Try to play. (Should work on signage/desktop; on iOS may require user interaction.)
+        // Attempt play (autoplay policies may apply)
         await video.play();
       } catch (err) {
-        // If autoplay fails, fall back gracefully
         console.warn("Instruction video autoplay failed:", err);
         stopAndHide();
         return;
       }
     }
 
-    // When video ends, hide
-    video.addEventListener("ended", () => {
-      stopAndHide();
-    });
+    // When video ends, fade out
+    video.addEventListener("ended", () => stopAndHide());
 
-    // If video errors, hide
+    // If video errors, fade out
     video.addEventListener("error", () => {
       console.warn("Instruction video error.");
       stopAndHide();
     });
 
-    // Optional: allow ESC to close (for testing)
+    // Optional: ESC closes (useful while testing)
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && isVideoPlaying) stopAndHide();
     });
 
-    // Kick off schedule
+    // Schedule playback
     setTimeout(() => {
-      playOnce(); // first play
+      playOnce();
       setInterval(playOnce, INSTRUCTIONS_INTERVAL_MS);
     }, INSTRUCTIONS_FIRST_DELAY_MS);
   }
 
-  // Call it once after page init
   setupInstructionsVideo();
 </script>
 </body>
