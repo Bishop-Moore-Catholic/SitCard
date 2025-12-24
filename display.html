@@ -471,21 +471,21 @@
     // NEXT
     if (nextIdx === -1){
       els.nextTime.textContent = '—';
-      pills(els.nextClubs, []);
+      pillsSide(els.nextClubs, []);
     } else {
-      const nxt = slots[nextIdx];
-      els.nextTime.textContent = nxt.timeLabel;
-      pills(els.nextClubs, nxt.clubs);
+      const nextSlot = slots[nextIdx];
+      els.nextTime.textContent = nextSlot.timeLabel;
+      pillsSide(els.nextClubs, nextSlot.clubs);
     }
 
     // ARRIVING
     if (arrivingIdx === -1){
       els.arrivingTime.textContent = '—';
-      pillsSide(els.arrivingClubs, arr.clubs);
+      pillsSide(els.arrivingClubs, []);
     } else {
-      const arr = slots[arrivingIdx];
-      els.arrivingTime.textContent = arr.timeLabel;
-      pillsSide(els.arrivingClubs, arr.clubs);
+      const arrivingSlot = slots[arrivingIdx];
+      els.arrivingTime.textContent = arrivingSlot.timeLabel;
+      pillsSide(els.arrivingClubs, arrivingSlot.clubs);
     }
 
     // footer
