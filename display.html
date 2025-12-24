@@ -5,232 +5,251 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Club Picture Day Queue Display</title>
   <style>
-  :root{
-    --bg: #f5f7fb;
-    --card: #ffffff;
-    --card2: #ffffff;
-    --border: rgba(15, 23, 42, .12);
-    --text: rgba(15, 23, 42, .92);
-    --muted: rgba(15, 23, 42, .62);
-    --accent: #2563eb;   /* blue */
-    --ok: #16a34a;       /* green */
-    --warn: #f59e0b;
+    :root{
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --border: rgba(15, 23, 42, .12);
+      --text: rgba(15, 23, 42, .92);
+      --muted: rgba(15, 23, 42, .62);
+      --accent: #FFD180;
+      --ok: #16a34a;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
 
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  }
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
 
-  /* Full, clean, light background */
-  html, body { height: 100%; }
-  body{
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-  }
+    /* Full-screen, 16:9-friendly */
+    .wrap{
+      width: min(1800px, 100vw);
+      height: 100vh;
+      margin: 0 auto;
+      padding: clamp(16px, 2vw, 28px);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(14px, 1.6vw, 22px);
+      box-sizing: border-box;
+    }
 
-  /* Use the whole screen (16:9 display) */
-  .wrap{
-    width: min(1800px, 100vw);
-    height: 100vh;
-    margin: 0 auto;
-    padding: clamp(16px, 2vw, 28px);
-    display: grid;
-    gap: clamp(14px, 1.6vw, 22px);
-    box-sizing: border-box;
-    align-content: start;
-  }
+    .topbar{
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: clamp(16px, 1.8vw, 22px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+    }
 
-  .topbar{
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: center;
-    padding: clamp(16px, 1.8vw, 22px);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    background: var(--card);
-  }
+    .title{ display: grid; gap: 6px; }
+    .title h1{
+      font-size: clamp(22px, 2vw, 30px);
+      margin: 0;
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
+    .title .sub{
+      font-size: clamp(14px, 1.2vw, 18px);
+      color: var(--muted);
+    }
 
-  .title{ display: grid; gap: 6px; }
-  .title h1{
-    font-size: clamp(22px, 2vw, 30px);
-    margin: 0;
-    letter-spacing: .2px;
-    font-weight: 800;
-  }
-  .title .sub{
-    font-size: clamp(14px, 1.2vw, 18px);
-    color: var(--muted);
-  }
+    .controls{ display:flex; gap: 12px; align-items:center; }
+    select, button{
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: clamp(14px, 1.1vw, 18px);
+      outline: none;
+    }
+    button{ cursor:pointer; }
+    button:hover{ background: rgba(37,99,235,.06); border-color: rgba(37,99,235,.22); }
 
-  .controls{ display:flex; gap: 12px; align-items:center; }
-  select, button{
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    background: #ffffff;
-    color: var(--text);
-    padding: 12px 14px;
-    font-size: clamp(14px, 1.1vw, 18px);
-    outline: none;
-  }
-  button{ cursor:pointer; }
-  button:hover{ background: rgba(37,99,235,.06); border-color: rgba(37,99,235,.22); }
+    .card{
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--card);
+      padding: clamp(18px, 2vw, 28px);
+      box-sizing: border-box;
+    }
 
-  /* Big board layout */
-  .grid{
-    display: grid;
-    grid-template-columns: 2.2fr 1fr;
-    gap: clamp(14px, 1.6vw, 22px);
-    align-items: stretch;
-    min-height: 0;
-  }
+    /* BOARD: big current (>=70% height) + ticker */
+    .board{
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: clamp(14px, 1.6vw, 22px);
+      min-height: 0;
+    }
 
-  /* Keep 2 columns on most displays; only collapse on small devices */
-  @media (max-width: 900px){
-    .wrap{ height: auto; }
-    .grid{ grid-template-columns: 1fr; }
-  }
+    .current{
+      border-color: var(--muted);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(14px, 1.6vw, 22px);
+      min-height: 0;
+    }
 
-  .card{
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    background: var(--card);
-    padding: clamp(18px, 2vw, 28px);
-    box-sizing: border-box;
-  }
+    .badge{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: clamp(13px, 1.0vw, 16px);
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(37,99,235,.06);
+      color: var(--muted);
+      width: fit-content;
+    }
+    .badge strong{ color: var(--text); font-weight: 800; }
 
-  /* Current card */
-  .current{
-    border-color: rgba(37,99,235,.25);
-    box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: clamp(14px, 1.6vw, 22px);
-    min-height: 0;
-  }
+    .clubs{
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      min-height: 0;
+    }
+    .clubsTitle{
+      font-size: clamp(16px, 1.2vw, 20px);
+      color: var(--muted);
+      font-weight: 700;
+    }
 
-  .badge{
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-size: clamp(13px, 1.0vw, 16px);
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: rgba(37,99,235,.06);
-    color: var(--muted);
-  }
-  .badge strong{ color: var(--text); font-weight: 750; }
+    /* Big, TV-readable club list */
+    .clubList{
+      display: grid;
+      gap: clamp(14px, 1.6vw, 22px);
+      align-content: start;
+      min-height: 0;
+    }
 
-  /* Clubs = PRIMARY content */
-  .clubs{
-    display: grid;
-    gap: 12px;
-    align-content: start;
-    min-height: 0;
-  }
+    .pill{
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      border-radius: 22px;
+      padding: clamp(18px, 2.1vw, 30px);
+      font-weight: 950;
+      font-size: clamp(34px, 4.2vw, 72px);
+      line-height: 1.05;
+      word-break: break-word;
+    }
 
-  .clubsTitle{
-    font-size: clamp(16px, 1.2vw, 20px);
-    color: var(--muted);
-    font-weight: 650;
-  }
+    .metaRow{
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(15, 23, 42, .12);
+    }
 
-  .clubList{
-    display: grid;
-    gap: clamp(12px, 1.2vw, 16px);
-    min-height: 0;
-  }
+    .bigTime{
+      font-size: clamp(22px, 2.2vw, 38px);
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
+    .bigRange{
+      font-size: clamp(14px, 1.2vw, 18px);
+      color: var(--muted);
+      margin-top: 4px;
+    }
 
-  .pill{
-    border: 1px solid rgba(37,99,235,.22);
-    background: rgba(37,99,235,.07);
-    border-radius: 18px;
-    padding: clamp(16px, 1.6vw, 22px);
-    font-weight: 900;
-    font-size: clamp(26px, 2.6vw, 44px);
-    line-height: 1.05;
-  }
+    .bigRemain{ text-align:right; }
+    .bigRemain .mins{
+      font-size: clamp(28px, 3.2vw, 64px);
+      font-weight: 950;
+      color: var(--ok);
+      line-height: 1;
+    }
+    .bigRemain .lbl{
+      font-size: clamp(12px, 1.0vw, 16px);
+      color: var(--muted);
+      margin-top: 6px;
+    }
 
-  /* Time becomes secondary */
-  .metaRow{
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: end;
-    padding-top: 8px;
-    border-top: 1px dashed rgba(15, 23, 42, .12);
-  }
+    /* TICKER */
+    .ticker{
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 18px;
+      padding: 12px 14px;
+      overflow: hidden;
+    }
 
-  .bigTime{
-    font-size: clamp(24px, 2.2vw, 40px);
-    font-weight: 850;
-    letter-spacing: .2px;
-  }
-  .bigRange{
-    font-size: clamp(14px, 1.2vw, 18px);
-    color: var(--muted);
-    margin-top: 4px;
-  }
+    .tickerLabel{
+      font-weight: 900;
+      color: var(--muted);
+      font-size: clamp(14px, 1.4vw, 18px);
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(15,23,42,.03);
+      white-space: nowrap;
+    }
 
-  .bigRemain{ text-align:right; }
-  .bigRemain .mins{
-    font-size: clamp(28px, 2.6vw, 48px);
-    font-weight: 900;
-    color: var(--ok);
-  }
-  .bigRemain .lbl{
-    font-size: clamp(12px, 1.0vw, 16px);
-    color: var(--muted);
-  }
+    .tickerViewport{ overflow: hidden; width: 100%; }
+    .tickerTrack{
+      display: inline-flex;
+      gap: 14px;
+      align-items: center;
+      white-space: nowrap;
+      will-change: transform;
+      animation: tickerMove linear infinite;
+      animation-duration: var(--ticker-speed, 45s);
+    }
 
-  /* Next / Arriving cards bigger */
-  .sideCol{
-    display: grid;
-    gap: clamp(14px, 1.6vw, 22px);
-    height: 100%;
-  }
+    .tickerItem{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,.03);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: clamp(18px, 1.8vw, 26px);
+      font-weight: 850;
+    }
 
-  .smallHead{
-    display:flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .smallHead .label{
-    font-size: clamp(14px, 1.1vw, 18px);
-    color: var(--muted);
-    font-weight: 750;
-  }
-  .smallHead .time{
-    font-size: clamp(22px, 2.0vw, 34px);
-    font-weight: 900;
-  }
+    .tickerTime{
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+      font-weight: 950;
+      color: var(--text);
+    }
 
-  .sidePill{
-    border: 1px solid var(--border);
-    background: rgba(15,23,42,.03);
-    border-radius: 16px;
-    padding: 14px 16px;
-    font-weight: 800;
-    font-size: clamp(18px, 1.6vw, 26px);
-    line-height: 1.1;
-  }
+    .tickerSep{ opacity: .45; }
 
-  .footer{
-    font-size: clamp(12px, 1.0vw, 16px);
-    color: var(--muted);
-    display:flex;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 0 4px;
-  }
+    @keyframes tickerMove{
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
 
-  .mono{ font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
-  .muted{ color: var(--muted); }
-  .err{ color: #b91c1c; }
-</style>
+    .footer{
+      font-size: clamp(12px, 1.0vw, 16px);
+      color: var(--muted);
+      display:flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+    }
+
+    .mono{ font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+    .muted{ color: var(--muted); }
+    .err{ color: #b91c1c; }
+  </style>
 </head>
+
 <body>
   <div class="wrap">
     <div class="topbar">
@@ -251,17 +270,16 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="board">
+      <!-- CURRENT (big, full width) -->
       <div class="card current" id="currentCard">
         <span class="badge">Now: <strong id="currentLabel">—</strong></span>
 
-        <!-- CLUBS FIRST (primary) -->
         <div class="clubs">
-          <div class="clubsTitle">Clubs in this slot</div>
+          <div class="clubsTitle">Clubs Photographing Now:</div>
           <div class="clubList" id="currentClubs"></div>
         </div>
 
-        <!-- TIME / REMAINING (secondary) -->
         <div class="metaRow">
           <div>
             <div class="bigTime mono" id="currentTime">—</div>
@@ -274,22 +292,13 @@
         </div>
       </div>
 
-
-      <div style="display:grid; gap:14px;" class="sideCol">
-        <div class="card" id="nextCard">
-          <div class="smallHead">
-            <div class="label">Next</div>
-            <div class="time mono" id="nextTime">—</div>
+      <!-- TICKER (bottom) -->
+      <div class="ticker" aria-label="Upcoming slots">
+        <div class="tickerLabel">Arriving</div>
+        <div class="tickerViewport">
+          <div class="tickerTrack" id="tickerTrack">
+            <div class="tickerItem muted">Loading…</div>
           </div>
-          <div class="clubList" id="nextClubs"></div>
-        </div>
-
-        <div class="card" id="arrivingCard">
-          <div class="smallHead">
-            <div class="label">Arriving</div>
-            <div class="time mono" id="arrivingTime">—</div>
-          </div>
-          <div class="clubList" id="arrivingClubs"></div>
         </div>
       </div>
     </div>
@@ -301,7 +310,7 @@
   </div>
 
 <script>
-  // ✅ Replace with your deployed Apps Script Web App URL (ends with /exec)
+  // Your Apps Script Web App URL (ends with /exec)
   const API_BASE = "https://script.google.com/a/macros/bishopmoore.org/s/AKfycbxupx-ve0SwiESEanmV6jTkL6lL6kiD5uupE_lU1b20qVoaxahBWg6RNcByCPuDXUa_/exec";
 
   let schedule = {
@@ -324,11 +333,7 @@
     minsRemaining: document.getElementById('minsRemaining'),
     currentClubs: document.getElementById('currentClubs'),
 
-    nextTime: document.getElementById('nextTime'),
-    nextClubs: document.getElementById('nextClubs'),
-
-    arrivingTime: document.getElementById('arrivingTime'),
-    arrivingClubs: document.getElementById('arrivingClubs'),
+    tickerTrack: document.getElementById('tickerTrack'),
   };
 
   function pad2(n){ return String(n).padStart(2,'0'); }
@@ -372,27 +377,56 @@
     });
   }
 
-  function pillsSide(node, clubs){
-    clearNode(node);
-    if (!clubs || clubs.length === 0){
-      const span = document.createElement('div');
-      span.className = 'muted';
-      span.textContent = '—';
-      node.appendChild(span);
+  function escapeHTML(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  function buildTickerItems(slots, startIdx){
+    const items = [];
+    for (let i = Math.max(0, startIdx); i < slots.length; i++){
+      const slot = slots[i];
+      const clubs = (slot.clubs || []).join(", ");
+      items.push({ time: slot.timeLabel, text: clubs || "—" });
+    }
+    return items;
+  }
+
+  function renderTicker(items){
+    const track = els.tickerTrack;
+    if (!track) return;
+
+    if (!items || items.length === 0){
+      track.innerHTML = `<div class="tickerItem muted">No more scheduled slots</div>`;
+      track.style.animation = "none";
       return;
     }
-    clubs.forEach(c => {
-      const p = document.createElement('div');
-      p.className = 'sidePill';
-      p.textContent = c;
-      node.appendChild(p);
-    });
+
+    const htmlOnce = items.map(it => `
+      <div class="tickerItem">
+        <span class="tickerTime">${escapeHTML(it.time)}</span>
+        <span class="tickerSep">•</span>
+        <span>${escapeHTML(it.text)}</span>
+      </div>
+    `).join("");
+
+    // Duplicate for seamless loop
+    track.innerHTML = htmlOnce + htmlOnce;
+
+    // Auto speed: longer content = slower
+    const approxChars = items.reduce((sum, it) => sum + it.time.length + it.text.length + 6, 0);
+    const seconds = Math.min(90, Math.max(28, approxChars * 0.18));
+    track.style.setProperty("--ticker-speed", `${seconds}s`);
+
+    // Ensure animation is on
+    track.style.animation = "";
   }
 
   function computeIndices(){
     const now = minutesNow();
     const slots = schedule.slots || [];
-    if (slots.length === 0) return { currentIdx: -1, nextIdx: -1, arrivingIdx: -1, endMinutes: null };
+    if (slots.length === 0) return { currentIdx: -1, nextIdx: -1, endMinutes: null };
 
     // Find last slot whose start <= now
     let idx = -1;
@@ -401,38 +435,36 @@
       else break;
     }
 
-    // Before first slot: "current" is none, next is first, arriving is second
+    // Before first slot
     if (idx === -1){
-      return { currentIdx: -1, nextIdx: 0, arrivingIdx: slots.length > 1 ? 1 : -1, endMinutes: null };
+      return { currentIdx: -1, nextIdx: 0, endMinutes: null };
     }
 
-    // Determine end of current slot: next slot start OR default duration for last slot
+    // End time: next slot start OR default duration for last slot
     let end;
     if (idx < slots.length - 1) end = slots[idx + 1].timeMinutes;
     else end = slots[idx].timeMinutes + schedule.defaultLastSlotMinutes;
 
-    // If we're past the computed end (e.g. large gap + default too small), treat as no current.
+    // If we've passed end, no active slot; next is idx+1
     if (now >= end){
       const next = idx + 1 < slots.length ? idx + 1 : -1;
-      const arr = idx + 2 < slots.length ? idx + 2 : -1;
-      return { currentIdx: -1, nextIdx: next, arrivingIdx: arr, endMinutes: null };
+      return { currentIdx: -1, nextIdx: next, endMinutes: null };
     }
 
     return {
       currentIdx: idx,
       nextIdx: idx + 1 < slots.length ? idx + 1 : -1,
-      arrivingIdx: idx + 2 < slots.length ? idx + 2 : -1,
       endMinutes: end
     };
   }
 
   function render(){
-    const { currentIdx, nextIdx, arrivingIdx, endMinutes } = computeIndices();
+    const { currentIdx, nextIdx, endMinutes } = computeIndices();
     const slots = schedule.slots || [];
     const now = minutesNow();
 
     // CURRENT
-    if (currentIdx === -1) {
+    if (currentIdx === -1){
       els.currentLabel.textContent = 'No active slot';
       els.currentTime.textContent = '—';
       els.currentRange.textContent = (nextIdx !== -1)
@@ -451,31 +483,14 @@
       const minsLeft = Math.max(0, Math.ceil((endMinutes - now)));
       els.minsRemaining.textContent = String(minsLeft);
 
-      // ✅ Current slot should use BIG pills
       pills(els.currentClubs, cur.clubs);
     }
 
-    // NEXT
-    if (nextIdx === -1) {
-      els.nextTime.textContent = '—';
-      pillsSide(els.nextClubs, []);
-    } else {
-      const nextSlot = slots[nextIdx];
-      els.nextTime.textContent = nextSlot.timeLabel;
-      pillsSide(els.nextClubs, nextSlot.clubs);
-    }
+    // TICKER: everything from NEXT onward
+    const tickerItems = (nextIdx !== -1) ? buildTickerItems(slots, nextIdx) : [];
+    renderTicker(tickerItems);
 
-    // ARRIVING
-    if (arrivingIdx === -1) {
-      els.arrivingTime.textContent = '—';
-      pillsSide(els.arrivingClubs, []);
-    } else {
-      const arrivingSlot = slots[arrivingIdx];
-      els.arrivingTime.textContent = arrivingSlot.timeLabel;
-      pillsSide(els.arrivingClubs, arrivingSlot.clubs);
-    }
-
-    // footer
+    // Footer
     els.lastUpdated.textContent = `Updated: ${schedule.lastUpdated ? schedule.lastUpdated : '—'}`;
   }
 
@@ -493,7 +508,8 @@
     const meta = await fetchJSON(`${API_BASE}?mode=meta`);
     const dates = meta.dates || [];
 
-    clearNode(els.dateSelect);
+    // Populate dropdown
+    els.dateSelect.innerHTML = "";
     if (dates.length === 0){
       const opt = document.createElement('option');
       opt.textContent = "No dates found";
@@ -514,7 +530,7 @@
     els.dateSelect.disabled = false;
     els.refreshBtn.disabled = false;
 
-    // default to first date (or persist last selection)
+    // Restore last selection if available
     const saved = localStorage.getItem("bmc_display_date");
     if (saved && dates.includes(saved)) els.dateSelect.value = saved;
 
@@ -544,7 +560,7 @@
     render();
   }, 1000);
 
-  // Periodic data refresh (keeps clubs updated if sheet changes)
+  // Periodic data refresh
   setInterval(() => {
     if (!els.dateSelect.disabled) loadScheduleForSelectedDate().catch(() => {});
   }, 60000);
@@ -561,10 +577,9 @@
     });
   });
 
-  // Init
   (async function init(){
     try {
-      if (!API_BASE || API_BASE.includes("YOUR_WEB_APP_URL_HERE")) {
+      if (!API_BASE) {
         els.status.innerHTML = `<span class="err">Set API_BASE to your Apps Script Web App URL.</span>`;
         return;
       }
