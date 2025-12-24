@@ -432,7 +432,7 @@
     const now = minutesNow();
 
     // CURRENT
-    if (currentIdx === -1){
+    if (currentIdx === -1) {
       els.currentLabel.textContent = 'No active slot';
       els.currentTime.textContent = '—';
       els.currentRange.textContent = (nextIdx !== -1)
@@ -451,11 +451,12 @@
       const minsLeft = Math.max(0, Math.ceil((endMinutes - now)));
       els.minsRemaining.textContent = String(minsLeft);
 
-      pillsSide(els.nextClubs, nxt.clubs);
+      // ✅ Current slot should use BIG pills
+      pills(els.currentClubs, cur.clubs);
     }
 
     // NEXT
-    if (nextIdx === -1){
+    if (nextIdx === -1) {
       els.nextTime.textContent = '—';
       pillsSide(els.nextClubs, []);
     } else {
@@ -465,7 +466,7 @@
     }
 
     // ARRIVING
-    if (arrivingIdx === -1){
+    if (arrivingIdx === -1) {
       els.arrivingTime.textContent = '—';
       pillsSide(els.arrivingClubs, []);
     } else {
