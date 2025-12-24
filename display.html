@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Club Queue Display</title>
+  <style>
+    :root{
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --border:#d7e0ee;
+      --text:#0b1220;
+      --muted:#5a6a85;
+      --accent:#24A0CD;
+      --ok:#0bbf6a;
+      --warn:#f59e0b;
+      --arrive:#7c3aed;
+      --shadow: 0 8px 24px rgba(15, 23, 42, .08);
+      --radius: 16px;
+    }
+    body{ margin:0; padding:18px; background:var(--bg); color:var(--text); }
+    .wrap{ max-width: 1100px; margin:0 auto; display:grid; gap:14px; }
+    header{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+      padding: 6px 2px;
+    }
+    h1{ font-size: 18px; margin:0; letter-spacing:.2px; }
+    .meta{ text-align:right; }
+    .clock{ font-variant-numeric: tabular-nums; font-weight:700; font-size: 16px; }
+    .status{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } .meta{ text-align:left; } header{ align-items:flex-start; } }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+      min-height: 150px;
+    }
+    .tag{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size: 12px; font-weight: 800;
+      padding: 8px 10px;
+      border-radius: 999px;
+      letter-spacing:.2px;
+      border:1px solid var(--border);
+      background: #f8fbff;
+    }
+    .dot{ width:10px; height:10px; border-radius:999px; background: var(--accent); }
+    .tag.current .dot{ background: var(--ok); }
+    .tag.next .dot{ background: var(--warn); }
+    .tag.arriving .dot{ background: var(--arrive); }
+
+    .slotTime{
+      margin-top: 10px;
+      font-size: 14px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .club{
+      margin-top: 6px;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: .2px;
+      word-break: break-word;
+    }
+    .empty{
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .footer{
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .small{
+      font-size:12px;
+      color: var(--muted);
+    }
+    .pill{
+      display:inline-block;
+      margin-top: 10px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background:#fff;
+      color: var(--muted);
+    }
+    .error{
+      border-color: rgba(239, 68, 68, .35);
+      background: rgba(239, 68, 68, .06);
+      color: #991b1b;
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+    a{ color: var(--accent); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Club Picture Queue</h1>
+        <div class="small">Auto-updating from Google Sheets CSV</div>
+      </div>
+      <div class="meta">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="status" id="status">Loading…</div>
+      </div>
+    </header>
+
+    <div id="msg"></div>
+
+    <section class="grid">
+      <div class="card" id="cardCurrent">
+        <div class="tag current"><span class="dot"></span> CURRENT</div>
+        <div class="slotTime" id="currentTime">—</div>
+        <div class="club" id="currentClub">—</div>
+        <div class="empty" id="currentEmpty" style="display:none;">No active slot right now.</div>
+      </div>
+
+      <div class="card" id="cardNext">
+        <div class="tag next"><span class="dot"></span> NEXT</div>
+        <div class="slotTime" id="nextTime">—</div>
+        <div class="club" id="nextClub">—</div>
+        <div class="empty" id="nextEmpty" style="display:none;">No upcoming slot found.</div>
+      </div>
+
+      <div class="card" id="cardArriving">
+        <div class="tag arriving"><span class="dot"></span> ARRIVING</div>
+        <div class="slotTime" id="arriveTime">—</div>
+        <div class="club" id="arriveClub">—</div>
+        <div class="empty" id="arriveEmpty" style="display:none;">No upcoming slot found.</div>
+      </div>
+    </section>
+
+    <div class="footer">
+      Source: <a id="srcLink" href="#" target="_blank" rel="noreferrer">CSV</a>
+      <span class="pill" id="lastUpdated">Last update: —</span>
+    </div>
+  </div>
+
+<script>
+/**
+ * CONFIG — adjust these if your sheet uses different headers.
+ */
+const CONFIG = {
+  CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQs88rR8aIqdDYOrpAY5-OSEAxOKAKJAAiSxcmqPI92Vk3kNFEb0w2k8n4oSBXadinF6-8d7jteB4mH/pub?output=csv",
+  TIMEZONE: "America/New_York",
+
+  // If your sheet has a single "Time Slot" like "2:10 PM - 2:20 PM", set TIME_RANGE_HEADER to match.
+  // If your sheet has separate Start/End columns, set START_TIME_HEADER and END_TIME_HEADER.
+  // The code tries to auto-detect if you leave these blank.
+  TIME_RANGE_HEADER: "",      // e.g. "Time Slot" or "Slot"
+  START_TIME_HEADER: "",      // e.g. "Start"
+  END_TIME_HEADER: "",        // e.g. "End"
+
+  // Club name column header (or leave blank to auto-detect).
+  CLUB_HEADER: "",            // e.g. "Club"
+
+  // If you only have a start time (no end time), set a default slot length (minutes):
+  DEFAULT_SLOT_MINUTES: 10,
+
+  // Refresh cadence
+  FETCH_EVERY_MS: 15000,      // re-fetch CSV
+  CLOCK_TICK_MS: 1000         // update clock display
+};
+
+const el = (id) => document.getElementById(id);
+el("srcLink").href = CONFIG.CSV_URL;
+
+/** Build a "now" Date in the configured timezone */
+function nowInTZ() {
+  // Convert local now -> string in TZ -> Date
+  return new Date(new Date().toLocaleString("en-US", { timeZone: CONFIG.TIMEZONE }));
+}
+
+/** Lightweight CSV parser (handles quotes, commas, newlines) */
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cur = "", inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i+1];
+
+    if (c === '"' && inQuotes && next === '"') { cur += '"'; i++; continue; }
+    if (c === '"') { inQuotes = !inQuotes; continue; }
+
+    if (!inQuotes && (c === ",")) { row.push(cur); cur = ""; continue; }
+    if (!inQuotes && (c === "\n")) { row.push(cur); rows.push(row); row = []; cur = ""; continue; }
+    if (c === "\r") continue;
+
+    cur += c;
+  }
+  row.push(cur);
+  rows.push(row);
+
+  // remove empty trailing rows
+  return rows.filter(r => r.some(cell => (cell || "").trim() !== ""));
+}
+
+function normalizeHeader(h) {
+  return (h || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findHeaderIndex(headers, candidates) {
+  const map = headers.map(normalizeHeader);
+  for (const cand of candidates) {
+    const idx = map.indexOf(normalizeHeader(cand));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+/** Parse time strings like "2:10 PM", "14:10", "2:10pm" into a Date on the same day as baseDate (TZ already baked into baseDate) */
+function parseTimeOnDate(timeStr, baseDate) {
+  if (!timeStr) return null;
+  const s = String(timeStr).trim();
+  if (!s) return null;
+
+  // Match HH:MM with optional AM/PM
+  const m = s.match(/^\s*(\d{1,2})(?::(\d{2}))?\s*([aApP]\.?[mM]\.?)?\s*$/);
+  if (!m) return null;
+
+  let hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2] || "0", 10);
+  const ampm = (m[3] || "").toLowerCase().replace(/\./g, "");
+
+  if (ampm === "pm" && hh < 12) hh += 12;
+  if (ampm === "am" && hh === 12) hh = 0;
+
+  const d = new Date(baseDate);
+  d.setHours(hh, mm, 0, 0);
+  return d;
+}
+
+/** Parse a range like "2:10 PM - 2:20 PM" or "14:10-14:20" */
+function parseTimeRange(rangeStr, baseDate) {
+  if (!rangeStr) return { start: null, end: null, label: "" };
+  const raw = String(rangeStr).trim();
+  const parts = raw.split(/[-–—]/).map(x => x.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const start = parseTimeOnDate(parts[0], baseDate);
+    const end = parseTimeOnDate(parts[1], baseDate);
+    return { start, end, label: raw };
+  }
+  // single time fallback
+  const start = parseTimeOnDate(raw, baseDate);
+  let end = null;
+  if (start) {
+    end = new Date(start);
+    end.setMinutes(end.getMinutes() + CONFIG.DEFAULT_SLOT_MINUTES);
+  }
+  return { start, end, label: raw };
+}
+
+function formatTimeRangeLabel(slot) {
+  if (slot.label) return slot.label;
+  if (!slot.start) return "—";
+  const opts = { hour: "numeric", minute: "2-digit" };
+  const a = slot.start.toLocaleTimeString("en-US", opts);
+  const b = slot.end ? slot.end.toLocaleTimeString("en-US", opts) : "";
+  return b ? `${a} - ${b}` : a;
+}
+
+function setCard(kind, slotRow) {
+  const isEmpty = !slotRow;
+
+  const map = {
+    current: { time: "currentTime", club: "currentClub", empty: "currentEmpty" },
+    next:    { time: "nextTime",    club: "nextClub",    empty: "nextEmpty" },
+    arrive:  { time: "arriveTime",  club: "arriveClub",  empty: "arriveEmpty" }
+  }[kind];
+
+  el(map.time).textContent = isEmpty ? "—" : slotRow.timeLabel;
+  el(map.club).textContent = isEmpty ? "—" : slotRow.club;
+  el(map.empty).style.display = isEmpty ? "block" : "none";
+}
+
+function showMsg(html, isError=false) {
+  el("msg").innerHTML = html ? `<div class="${isError ? "error" : ""}">${html}</div>` : "";
+}
+
+function inferColumns(headers) {
+  // Club candidates
+  const clubIdx = (CONFIG.CLUB_HEADER)
+    ? findHeaderIndex(headers, [CONFIG.CLUB_HEADER])
+    : findHeaderIndex(headers, ["club","group","organization","activity","name"]);
+
+  // Time candidates
+  const rangeIdx = (CONFIG.TIME_RANGE_HEADER)
+    ? findHeaderIndex(headers, [CONFIG.TIME_RANGE_HEADER])
+    : findHeaderIndex(headers, ["time slot","timeslot","slot","time","period","block"]);
+
+  const startIdx = (CONFIG.START_TIME_HEADER)
+    ? findHeaderIndex(headers, [CONFIG.START_TIME_HEADER])
+    : findHeaderIndex(headers, ["start","start time","begin","begin time"]);
+
+  const endIdx = (CONFIG.END_TIME_HEADER)
+    ? findHeaderIndex(headers, [CONFIG.END_TIME_HEADER])
+    : findHeaderIndex(headers, ["end","end time","stop","finish","finish time"]);
+
+  return { clubIdx, rangeIdx, startIdx, endIdx };
+}
+
+async function fetchAndRender() {
+  const status = el("status");
+  status.textContent = "Refreshing…";
+
+  try {
+    const url = CONFIG.CSV_URL + (CONFIG.CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+    const text = await res.text();
+
+    const rows = parseCSV(text);
+    if (rows.length < 2) throw new Error("CSV has no data rows.");
+
+    const headers = rows[0];
+    const { clubIdx, rangeIdx, startIdx, endIdx } = inferColumns(headers);
+
+    if (clubIdx === -1) {
+      throw new Error(`Could not find a Club column. Found headers: ${headers.join(", ")}`);
+    }
+    if (rangeIdx === -1 && startIdx === -1) {
+      throw new Error(`Could not find a Time Slot column (range) or Start column. Found headers: ${headers.join(", ")}`);
+    }
+
+    const baseNow = nowInTZ();
+
+    const data = rows.slice(1).map((r, i) => {
+      const club = (r[clubIdx] || "").trim();
+      const rangeVal = rangeIdx !== -1 ? (r[rangeIdx] || "").trim() : "";
+      const startVal = startIdx !== -1 ? (r[startIdx] || "").trim() : "";
+      const endVal = endIdx !== -1 ? (r[endIdx] || "").trim() : "";
+
+      let start = null, end = null, label = "";
+
+      if (rangeVal) {
+        const parsed = parseTimeRange(rangeVal, baseNow);
+        start = parsed.start; end = parsed.end; label = parsed.label;
+      } else if (startVal) {
+        start = parseTimeOnDate(startVal, baseNow);
+        if (endVal) end = parseTimeOnDate(endVal, baseNow);
+        if (start && !end) {
+          end = new Date(start);
+          end.setMinutes(end.getMinutes() + CONFIG.DEFAULT_SLOT_MINUTES);
+        }
+        label = (startVal && endVal) ? `${startVal} - ${endVal}` : (startVal || "");
+      }
+
+      // Drop rows without a club OR without a usable start time
+      if (!club || !start) return null;
+
+      return {
+        club,
+        start,
+        end,
+        timeLabel: formatTimeRangeLabel({ start, end, label })
+      };
+    }).filter(Boolean);
+
+    // Sort by start time
+    data.sort((a,b) => a.start - b.start);
+
+    const now = baseNow.getTime();
+
+    let current = null;
+    for (const row of data) {
+      const endT = row.end ? row.end.getTime() : row.start.getTime();
+      if (row.start.getTime() <= now && now < endT) { current = row; break; }
+    }
+
+    // If we’re between slots, pick the next future slot as "current" (optional behavior)
+    // Comment this block out if you only want a true in-progress slot.
+    if (!current) {
+      const nextFuture = data.find(r => r.start.getTime() > now);
+      current = nextFuture || null;
+    }
+
+    // Next + arriving are the next two after the chosen "current" slot index (or from now)
+    let anchorIdx = current ? data.indexOf(current) : -1;
+    let next = null, arriving = null;
+
+    if (anchorIdx !== -1) {
+      next = data[anchorIdx + 1] || null;
+      arriving = data[anchorIdx + 2] || null;
+    } else {
+      const future = data.filter(r => r.start.getTime() > now);
+      next = future[0] || null;
+      arriving = future[1] || null;
+    }
+
+    setCard("current", current);
+    setCard("next", next);
+    setCard("arrive", arriving);
+
+    el("lastUpdated").textContent = "Last update: " + new Date().toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", second:"2-digit" });
+    status.textContent = `OK • ${data.length} slots loaded`;
+    showMsg("");
+
+  } catch (err) {
+    status.textContent = "Error";
+    showMsg(`Could not load queue. ${String(err.message || err)}`, true);
+    setCard("current", null);
+    setCard("next", null);
+    setCard("arrive", null);
+  }
+}
+
+function tickClock() {
+  const now = nowInTZ();
+  el("clock").textContent = now.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", second:"2-digit" });
+}
+
+// init
+tickClock();
+setInterval(tickClock, CONFIG.CLOCK_TICK_MS);
+fetchAndRender();
+setInterval(fetchAndRender, CONFIG.FETCH_EVERY_MS);
+</script>
+</body>
+</html>
