@@ -255,39 +255,25 @@
       <div class="card current" id="currentCard">
         <span class="badge">Now: <strong id="currentLabel">—</strong></span>
 
-        <div class="bigRow">
+        <!-- CLUBS FIRST (primary) -->
+        <div class="clubs">
+          <div class="clubsTitle">Clubs in this slot</div>
+          <div class="clubList" id="currentClubs"></div>
+        </div>
+
+        <!-- TIME / REMAINING (secondary) -->
+        <div class="metaRow">
           <div>
             <div class="bigTime mono" id="currentTime">—</div>
-            <div class="muted" id="currentRange">—</div>
+            <div class="bigRange" id="currentRange">—</div>
           </div>
           <div class="bigRemain">
             <div class="mins mono" id="minsRemaining">—</div>
             <div class="lbl">minutes remaining</div>
           </div>
         </div>
-
-        <div class="card current" id="currentCard">
-          <span class="badge">Now: <strong id="currentLabel">—</strong></span>
-
-          <!-- CLUBS FIRST (primary) -->
-          <div class="clubs">
-            <div class="clubsTitle">Clubs in this slot</div>
-            <div class="clubList" id="currentClubs"></div>
-          </div>
-
-          <!-- TIME / REMAINING (secondary) -->
-          <div class="metaRow">
-            <div>
-              <div class="bigTime mono" id="currentTime">—</div>
-              <div class="bigRange" id="currentRange">—</div>
-            </div>
-            <div class="bigRemain">
-              <div class="mins mono" id="minsRemaining">—</div>
-              <div class="lbl">minutes remaining</div>
-            </div>
-          </div>
-        </div>
       </div>
+
 
       <div style="display:grid; gap:14px;" class="sideCol">
         <div class="card" id="nextCard">
