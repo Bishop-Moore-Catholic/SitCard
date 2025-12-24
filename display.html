@@ -2,612 +2,465 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Club Queue Board</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Club Picture Day Queue Display</title>
   <style>
-    :root{
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      --bg:#0b0f14;
-      --panel:#0f1622;
-      --panel2:#0c131e;
-      --border:#223246;
-      --text:#e8eef6;
-      --muted:#9bb0cc;
-      --accent:#24A0CD;
-      --good:#00e36a;
-      --warn:#fbbf24;
-      --arr:#a78bfa;
-      --shadow: 0 18px 40px rgba(0,0,0,.35);
-      --r: 18px;
-    }
-    body{ margin:0; background:var(--bg); color:var(--text); padding:18px; }
-    .wrap{ max-width: 1200px; margin:0 auto; display:grid; gap:14px; }
+    :root {
+      --bg: #0b1020;
+      --card: rgba(255,255,255,.06);
+      --card2: rgba(255,255,255,.09);
+      --border: rgba(255,255,255,.10);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.70);
+      --accent: #4fb3ff;
+      --ok: #32d583;
+      --warn: #fdb022;
 
-    header{
-      display:flex; gap:12px; align-items:center; justify-content:space-between;
-      padding: 6px 2px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
-    .title{
-      display:flex; flex-direction:column; gap:2px;
+    body { margin: 0; background: radial-gradient(1200px 600px at 20% 10%, rgba(79,179,255,.25), transparent 60%), var(--bg); color: var(--text); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; display: grid; gap: 14px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,.04);
+      backdrop-filter: blur(10px);
     }
-    h1{ margin:0; font-size: 20px; letter-spacing:.2px; }
-    .sub{ color:var(--muted); font-size: 12px; }
+    .title { display: grid; gap: 2px; }
+    .title h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+    .title .sub { font-size: 13px; color: var(--muted); }
 
-    .controls{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
-    }
-    .chip{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius: 999px;
-      padding: 8px 12px;
-      display:flex; gap:10px; align-items:center;
-      box-shadow: var(--shadow);
-    }
-    .chip label{ font-size:12px; color:var(--muted); }
-    select{
-      background: transparent;
+    .controls { display: flex; gap: 10px; align-items: center; }
+    select, button {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
       color: var(--text);
-      border: 0;
-      outline: none;
-      font-weight: 800;
-      letter-spacing:.2px;
-      font-size: 13px;
-      appearance: none;
-      padding-right: 14px;
-      cursor:pointer;
-    }
-    .caret{
-      width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--muted);
-      margin-left:-6px;
-      pointer-events:none;
-    }
-    .clock{
-      font-variant-numeric: tabular-nums;
-      font-weight: 900;
-      font-size: 16px;
-      letter-spacing:.3px;
-    }
-    .status{
-      font-size:12px; color:var(--muted);
-      margin-left: 8px;
-    }
-
-    .board{
-      background: linear-gradient(180deg, var(--panel), var(--panel2));
-      border:1px solid var(--border);
-      border-radius: var(--r);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-
-    .row{
-      display:grid;
-      grid-template-columns: 170px 1fr 120px;
-      gap: 10px;
-      padding: 14px 16px;
-      align-items:center;
-      border-top:1px solid rgba(255,255,255,.06);
-    }
-    .row:first-child{ border-top:0; }
-
-    .badge{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      font-weight: 900;
-      letter-spacing:.25px;
-      font-size:12px;
-      color: var(--muted);
-      text-transform:uppercase;
-    }
-    .dot{ width:10px; height:10px; border-radius:99px; background:var(--accent); }
-    .dot.current{ background: var(--good); }
-    .dot.next{ background: var(--warn); }
-    .dot.arr{ background: var(--arr); }
-
-    .time{
-      font-variant-numeric: tabular-nums;
-      font-weight: 900;
-      letter-spacing:.4px;
-      font-size: 16px;
-    }
-    .club{
-      font-weight: 900;
-      font-size: 22px;
-      letter-spacing:.2px;
-      line-height: 1.1;
-      word-break: break-word;
-    }
-    .mins{
-      text-align:right;
-      font-variant-numeric: tabular-nums;
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 800;
-    }
-
-    /* Prominent CURRENT row */
-    .row.current{
-      padding: 22px 18px;
-      grid-template-columns: 220px 1fr 140px;
-      background: rgba(0, 227, 106, .06);
-      border-top: 0;
-      position: relative;
-    }
-    .row.current .time{ font-size: 22px; }
-    .row.current .club{ font-size: 40px; }
-    .row.current .mins{ font-size: 13px; }
-
-    .empty{
-      padding: 18px;
-      color: var(--muted);
+      padding: 10px 12px;
       font-size: 14px;
+      outline: none;
+    }
+    button { cursor: pointer; }
+    button:hover { background: rgba(255,255,255,.10); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
     }
 
-    .footer{
-      display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
-      color: var(--muted);
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+      padding: 16px;
+      backdrop-filter: blur(10px);
+    }
+
+    /* BIG CURRENT */
+    .current {
+      background: linear-gradient(180deg, rgba(79,179,255,.18), rgba(255,255,255,.04));
+      border-color: rgba(79,179,255,.35);
+      padding: 18px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 12px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .badge strong { color: var(--text); font-weight: 650; }
+
+    .bigRow {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .bigTime { font-size: 44px; font-weight: 800; letter-spacing: .2px; }
+    .bigRemain { text-align: right; }
+    .bigRemain .mins { font-size: 34px; font-weight: 800; color: var(--ok); }
+    .bigRemain .lbl { font-size: 12px; color: var(--muted); }
+
+    .clubs {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .clubList {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-weight: 650;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    /* Next / Arriving */
+    .smallHead {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .smallHead .label { font-size: 12px; color: var(--muted); }
+    .smallHead .time { font-size: 22px; font-weight: 800; }
+
+    .muted { color: var(--muted); }
+    .err { color: #ff7b7b; }
+    .footer {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
       padding: 0 2px;
     }
-    a{ color: var(--accent); text-decoration:none; }
-    a:hover{ text-decoration:underline; }
-
-    @media (max-width: 900px){
-      .row, .row.current{
-        grid-template-columns: 1fr;
-      }
-      .mins{ text-align:left; }
-      .controls{ justify-content:flex-start; }
-      .row.current .club{ font-size: 34px; }
-    }
+    .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
+    <div class="topbar">
       <div class="title">
-        <h1>Club Queue Board</h1>
-        <div class="sub">Live schedule • Current, Next, Arriving</div>
+        <h1>Club Picture Day Queue</h1>
+        <div class="sub">
+          <span class="mono" id="nowClock">--:--:--</span>
+          <span class="muted">•</span>
+          <span id="status">Loading dates…</span>
+        </div>
       </div>
 
       <div class="controls">
-        <div class="chip">
-          <label for="daySel">Day</label>
-          <select id="daySel"></select>
-          <div class="caret" aria-hidden="true"></div>
+        <select id="dateSelect" title="Select Assigned Date" disabled>
+          <option>Loading…</option>
+        </select>
+        <button id="refreshBtn" disabled>Refresh</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card current" id="currentCard">
+        <span class="badge">Now: <strong id="currentLabel">—</strong></span>
+
+        <div class="bigRow">
+          <div>
+            <div class="bigTime mono" id="currentTime">—</div>
+            <div class="muted" id="currentRange">—</div>
+          </div>
+          <div class="bigRemain">
+            <div class="mins mono" id="minsRemaining">—</div>
+            <div class="lbl">minutes remaining</div>
+          </div>
         </div>
 
-        <div class="chip">
-          <div class="clock" id="clock">--:--:--</div>
-          <div class="status" id="status">Loading…</div>
+        <div class="clubs">
+          <div class="muted">Clubs in this slot</div>
+          <div class="clubList" id="currentClubs"></div>
         </div>
       </div>
-    </header>
 
-    <div class="board" id="board">
-      <div class="empty">Loading schedule…</div>
+      <div style="display:grid; gap:14px;">
+        <div class="card" id="nextCard">
+          <div class="smallHead">
+            <div class="label">Next</div>
+            <div class="time mono" id="nextTime">—</div>
+          </div>
+          <div class="clubList" id="nextClubs"></div>
+        </div>
+
+        <div class="card" id="arrivingCard">
+          <div class="smallHead">
+            <div class="label">Arriving</div>
+            <div class="time mono" id="arrivingTime">—</div>
+          </div>
+          <div class="clubList" id="arrivingClubs"></div>
+        </div>
+      </div>
     </div>
 
     <div class="footer">
-      <div>Source: <a id="srcLink" href="#" target="_blank" rel="noreferrer">CSV</a></div>
-      <div id="lastUpdated">Last update: —</div>
+      <div>Data source: Apps Script</div>
+      <div class="mono" id="lastUpdated">Updated: —</div>
     </div>
   </div>
 
 <script>
-/**
- * CONFIG
- * - Column F is Day
- * - Column G is Time Slot
- * - Club name column is auto-detected (or set explicitly)
- */
-const CONFIG = {
-  CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQs88rR8aIqdDYOrpAY5-OSEAxOKAKJAAiSxcmqPI92Vk3kNFEb0w2k8n4oSBXadinF6-8d7jteB4mH/pub?gid=0&single=true&output=csv",
-  TIMEZONE: "America/New_York",
+  // ✅ Replace with your deployed Apps Script Web App URL (ends with /exec)
+  const API_BASE = "YOUR_WEB_APP_URL_HERE";
 
-  // Header names (preferred). If your headers differ, adjust these.
-  DAY_HEADER: "Assigned Date",     // Column F
-  TIME_HEADER: "Assigned Time",    // Column G
-
-  // Optional: if your club column header is known, set it.
-  // Otherwise, we'll auto-detect from common names AND fall back to "first non-empty text column" excluding day/time.
-  CLUB_HEADER: "Clubs",                 // e.g. "Club"
-
-  DEFAULT_SLOT_MINUTES: 10,
-  FETCH_EVERY_MS: 300000,
-  CLOCK_TICK_MS: 1000,
-
-  // If there is no truly "in-progress" slot, show the next upcoming as CURRENT
-  CURRENT_FALLS_FORWARD: true
-};
-
-const el = (id) => document.getElementById(id);
-el("srcLink").href = CONFIG.CSV_URL;
-
-/** Time helpers */
-function nowInTZ() {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: CONFIG.TIMEZONE }));
-}
-
-/** CSV parser (handles quotes, commas, newlines) */
-function parseCSV(text) {
-  const rows = [];
-  let row = [], cur = "", inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    const next = text[i+1];
-
-    if (c === '"' && inQuotes && next === '"') { cur += '"'; i++; continue; }
-    if (c === '"') { inQuotes = !inQuotes; continue; }
-
-    if (!inQuotes && c === ",") { row.push(cur); cur = ""; continue; }
-    if (!inQuotes && c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; continue; }
-    if (c === "\r") continue;
-
-    cur += c;
-  }
-  row.push(cur);
-  rows.push(row);
-  return rows.filter(r => r.some(cell => (cell || "").trim() !== ""));
-}
-
-function normalizeHeader(h) {
-  return (h || "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function findHeaderIndex(headers, candidates) {
-  const map = headers.map(normalizeHeader);
-  for (const cand of candidates) {
-    const idx = map.indexOf(normalizeHeader(cand));
-    if (idx !== -1) return idx;
-  }
-  return -1;
-}
-
-function parseTimeOnDate(timeStr, baseDate) {
-  if (!timeStr) return null;
-  const s = String(timeStr).trim();
-  if (!s) return null;
-
-  const m = s.match(/^\s*(\d{1,2})(?::(\d{2}))?\s*([aApP]\.?[mM]\.?)?\s*$/);
-  if (!m) return null;
-
-  let hh = parseInt(m[1], 10);
-  const mm = parseInt(m[2] || "0", 10);
-  const ampm = (m[3] || "").toLowerCase().replace(/\./g, "");
-
-  if (ampm === "pm" && hh < 12) hh += 12;
-  if (ampm === "am" && hh === 12) hh = 0;
-
-  const d = new Date(baseDate);
-  d.setHours(hh, mm, 0, 0);
-  return d;
-}
-
-function parseTimeRange(rangeStr, baseDate) {
-  if (!rangeStr) return { start: null, end: null, label: "" };
-  const raw = String(rangeStr).trim();
-
-  const parts = raw.split(/[-–—]/).map(x => x.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    const start = parseTimeOnDate(parts[0], baseDate);
-    const end = parseTimeOnDate(parts[1], baseDate);
-    return { start, end, label: raw };
-  }
-  const start = parseTimeOnDate(raw, baseDate);
-  let end = null;
-  if (start) {
-    end = new Date(start);
-    end.setMinutes(end.getMinutes() + CONFIG.DEFAULT_SLOT_MINUTES);
-  }
-  return { start, end, label: raw };
-}
-
-function formatRangeLabel(label, start, end) {
-  if (label) return label;
-  if (!start) return "—";
-  const opts = { hour: "numeric", minute: "2-digit" };
-  const a = start.toLocaleTimeString("en-US", opts);
-  const b = end ? end.toLocaleTimeString("en-US", opts) : "";
-  return b ? `${a} - ${b}` : a;
-}
-
-function minutesUntil(ts, now) {
-  const diffMs = ts - now;
-  const mins = Math.round(diffMs / 60000);
-  if (mins <= 0) return "Now";
-  if (mins === 1) return "1 min";
-  return `${mins} mins`;
-}
-
-function setStatus(text) { el("status").textContent = text; }
-
-/** Dropdown persistence */
-const DAY_STORAGE_KEY = "clubQueueSelectedDay";
-
-function getSavedDay() {
-  return localStorage.getItem(DAY_STORAGE_KEY) || "";
-}
-function saveDay(v) {
-  localStorage.setItem(DAY_STORAGE_KEY, v);
-}
-
-/** Column mapping */
-function inferColumns(headers, sampleRows) {
-  const dayIdx = findHeaderIndex(headers, [CONFIG.DAY_HEADER, "day", "date", "assigned date"]);
-  const timeIdx = findHeaderIndex(headers, [CONFIG.TIME_HEADER, "time", "time slot", "timeslot", "slot", "assigned time"]);
-
-  // Try explicit club header
-  let clubIdx = CONFIG.CLUB_HEADER
-    ? findHeaderIndex(headers, [CONFIG.CLUB_HEADER])
-    : findHeaderIndex(headers, ["club", "club name", "organization", "group", "activity", "name"]);
-
-  // If still unknown, fall back: pick a column that looks like club names (texty, not sponsor/co-sponsor/etc.)
-  if (clubIdx === -1) {
-    const blocked = new Set([dayIdx, timeIdx].filter(i => i !== -1));
-    const bannedHeaders = ["sponsor", "co-sponsor", "roster", "size"];
-    const headerNorm = headers.map(normalizeHeader);
-
-    // score each column by how many sample rows have a non-empty value
-    let best = { idx: -1, score: -1 };
-    for (let i = 0; i < headers.length; i++) {
-      if (blocked.has(i)) continue;
-      if (bannedHeaders.some(b => headerNorm[i].includes(b))) continue;
-
-      let score = 0;
-      for (const r of sampleRows) {
-        const v = (r[i] || "").trim();
-        if (v && v.length >= 2) score++;
-      }
-      if (score > best.score) best = { idx: i, score };
-    }
-    clubIdx = best.idx;
-  }
-
-  return { dayIdx, timeIdx, clubIdx };
-}
-
-/** Render board */
-function renderBoard({ current, next, arriving, selectedDay, now }) {
-  const board = el("board");
-  const fmtNow = now.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", second:"2-digit" });
-
-  if (!current && !next && !arriving) {
-    board.innerHTML = `<div class="empty">No slots found for <b>${escapeHtml(selectedDay || "this day")}</b>.</div>`;
-    return;
-  }
-
-  const rowHTML = (kind, item) => {
-    const dotClass = kind === "CURRENT" ? "current" : (kind === "NEXT" ? "next" : "arr");
-    const badgeDot = `<span class="dot ${dotClass}"></span>`;
-    const minsText = item
-      ? (kind === "CURRENT"
-          ? (item.end ? minutesUntil(item.end.getTime(), now.getTime()) + " left" : "Now")
-          : minutesUntil(item.start.getTime(), now.getTime()))
-      : "—";
-
-    const cls = kind === "CURRENT" ? "row current" : "row";
-    if (!item) {
-      return `
-        <div class="${cls}">
-          <div>
-            <div class="badge">${badgeDot} ${kind}</div>
-            <div class="time">—</div>
-          </div>
-          <div class="club">—</div>
-          <div class="mins">${minsText}</div>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="${cls}">
-        <div>
-          <div class="badge">${badgeDot} ${kind}</div>
-          <div class="time">${escapeHtml(item.timeLabel)}</div>
-        </div>
-        <div class="club">${escapeHtml(item.club)}</div>
-        <div class="mins">${escapeHtml(minsText)}</div>
-      </div>
-    `;
+  let schedule = {
+    date: null,
+    slots: [],
+    defaultLastSlotMinutes: 10,
+    lastUpdated: null
   };
 
-  board.innerHTML =
-    rowHTML("CURRENT", current) +
-    rowHTML("NEXT", next) +
-    rowHTML("ARRIVING", arriving);
-}
+  const els = {
+    nowClock: document.getElementById('nowClock'),
+    status: document.getElementById('status'),
+    dateSelect: document.getElementById('dateSelect'),
+    refreshBtn: document.getElementById('refreshBtn'),
+    lastUpdated: document.getElementById('lastUpdated'),
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
+    currentLabel: document.getElementById('currentLabel'),
+    currentTime: document.getElementById('currentTime'),
+    currentRange: document.getElementById('currentRange'),
+    minsRemaining: document.getElementById('minsRemaining'),
+    currentClubs: document.getElementById('currentClubs'),
 
-/** Main fetch+update */
-let lastDaysSignature = "";
+    nextTime: document.getElementById('nextTime'),
+    nextClubs: document.getElementById('nextClubs'),
 
-async function fetchAndUpdate() {
-  setStatus("Refreshing…");
-  try {
-    const url = CONFIG.CSV_URL + (CONFIG.CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now();
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
-    const text = await res.text();
+    arrivingTime: document.getElementById('arrivingTime'),
+    arrivingClubs: document.getElementById('arrivingClubs'),
+  };
 
-    const rows = parseCSV(text);
-    if (rows.length < 2) throw new Error("CSV has no data rows.");
+  function pad2(n){ return String(n).padStart(2,'0'); }
 
-    const headers = rows[0];
-    const sampleRows = rows.slice(1, 8);
+  function fmtClock(d){
+    let h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return `${h}:${pad2(m)}:${pad2(s)} ${ap}`;
+  }
 
-    const { dayIdx, timeIdx, clubIdx } = inferColumns(headers, sampleRows);
+  function minutesNow(){
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes() + (d.getSeconds()/60);
+  }
 
-    // Column F/G should exist; if header matching fails, we still try to fall back to F/G positions
-    const fallbackDayIdx = 5;  // Col F
-    const fallbackTimeIdx = 6; // Col G
+  function minToLabel(mins){
+    const hh24 = Math.floor(mins / 60);
+    const mm = Math.floor(mins % 60);
+    let hh12 = hh24 % 12; if (hh12 === 0) hh12 = 12;
+    const ap = hh24 >= 12 ? 'PM' : 'AM';
+    return `${hh12}:${pad2(mm)} ${ap}`;
+  }
 
-    const finalDayIdx = (dayIdx !== -1) ? dayIdx : fallbackDayIdx;
-    const finalTimeIdx = (timeIdx !== -1) ? timeIdx : fallbackTimeIdx;
+  function clearNode(node){ while(node.firstChild) node.removeChild(node.firstChild); }
 
-    if (clubIdx === -1) {
-      throw new Error(
-        `Could not identify the Club column. ` +
-        `Try setting CONFIG.CLUB_HEADER to your exact club column header. ` +
-        `Headers seen: ${headers.join(", ")}`
-      );
+  function pills(node, clubs){
+    clearNode(node);
+    if (!clubs || clubs.length === 0){
+      const span = document.createElement('div');
+      span.className = 'muted';
+      span.textContent = '—';
+      node.appendChild(span);
+      return;
+    }
+    clubs.forEach(c => {
+      const p = document.createElement('div');
+      p.className = 'pill';
+      p.textContent = c;
+      node.appendChild(p);
+    });
+  }
+
+  function computeIndices(){
+    const now = minutesNow();
+    const slots = schedule.slots || [];
+    if (slots.length === 0) return { currentIdx: -1, nextIdx: -1, arrivingIdx: -1, endMinutes: null };
+
+    // Find last slot whose start <= now
+    let idx = -1;
+    for (let i = 0; i < slots.length; i++){
+      if (slots[i].timeMinutes <= now) idx = i;
+      else break;
     }
 
-    const baseNow = nowInTZ();
-
-    // Build list of days (dropdown options)
-    const daySet = new Set();
-    for (const r of rows.slice(1)) {
-      const d = (r[finalDayIdx] || "").trim();
-      if (d) daySet.add(d);
-    }
-    const days = Array.from(daySet);
-
-    // Keep dropdown stable (only repopulate when set changes)
-    const sig = days.slice().sort().join("||");
-    if (sig !== lastDaysSignature) {
-      lastDaysSignature = sig;
-      populateDayDropdown(days);
+    // Before first slot: "current" is none, next is first, arriving is second
+    if (idx === -1){
+      return { currentIdx: -1, nextIdx: 0, arrivingIdx: slots.length > 1 ? 1 : -1, endMinutes: null };
     }
 
-    // Determine selected day
-    const selEl = el("daySel");
-    let selectedDay = selEl.value || getSavedDay();
+    // Determine end of current slot: next slot start OR default duration for last slot
+    let end;
+    if (idx < slots.length - 1) end = slots[idx + 1].timeMinutes;
+    else end = slots[idx].timeMinutes + schedule.defaultLastSlotMinutes;
 
-    // If none selected yet, pick first day (sorted)
-    if (!selectedDay) {
-      selectedDay = (days.slice().sort()[0] || "");
+    // If we're past the computed end (e.g. large gap + default too small), treat as no current.
+    if (now >= end){
+      const next = idx + 1 < slots.length ? idx + 1 : -1;
+      const arr = idx + 2 < slots.length ? idx + 2 : -1;
+      return { currentIdx: -1, nextIdx: next, arrivingIdx: arr, endMinutes: null };
     }
 
-    // If selected day no longer exists, fall back
-    if (selectedDay && !daySet.has(selectedDay)) {
-      selectedDay = (days.slice().sort()[0] || "");
-    }
+    return {
+      currentIdx: idx,
+      nextIdx: idx + 1 < slots.length ? idx + 1 : -1,
+      arrivingIdx: idx + 2 < slots.length ? idx + 2 : -1,
+      endMinutes: end
+    };
+  }
 
-    if (selEl.value !== selectedDay) selEl.value = selectedDay;
-    saveDay(selectedDay);
+  function render(){
+    const { currentIdx, nextIdx, arrivingIdx, endMinutes } = computeIndices();
+    const slots = schedule.slots || [];
+    const now = minutesNow();
 
-    // Build schedule rows filtered by day
-    const data = rows.slice(1).map(r => {
-      const day = (r[finalDayIdx] || "").trim();
-      if (selectedDay && day !== selectedDay) return null;
-
-      const timeStr = (r[finalTimeIdx] || "").trim();
-      const club = (r[clubIdx] || "").trim();
-      if (!timeStr || !club) return null;
-
-      const parsed = parseTimeRange(timeStr, baseNow);
-      if (!parsed.start) return null;
-
-      return {
-        club,
-        start: parsed.start,
-        end: parsed.end,
-        timeLabel: formatRangeLabel(parsed.label, parsed.start, parsed.end)
-      };
-    }).filter(Boolean);
-
-    data.sort((a,b) => a.start - b.start);
-
-    const now = baseNow.getTime();
-
-    // Find true current (in-progress)
-    let current = data.find(item => {
-      const s = item.start.getTime();
-      const e = (item.end ? item.end.getTime() : s);
-      return s <= now && now < e;
-    }) || null;
-
-    // If not in-progress, optionally "fall forward" to next upcoming
-    if (!current && CONFIG.CURRENT_FALLS_FORWARD) {
-      current = data.find(item => item.start.getTime() > now) || null;
-    }
-
-    // Determine next and arriving relative to "current" (or from now if no current)
-    let next = null, arriving = null;
-
-    if (current) {
-      const idx = data.indexOf(current);
-      next = data[idx + 1] || null;
-      arriving = data[idx + 2] || null;
+    // CURRENT
+    if (currentIdx === -1){
+      els.currentLabel.textContent = 'No active slot';
+      els.currentTime.textContent = '—';
+      els.currentRange.textContent = (nextIdx !== -1)
+        ? `Next begins at ${slots[nextIdx].timeLabel}`
+        : 'No more scheduled slots';
+      els.minsRemaining.textContent = '—';
+      pills(els.currentClubs, []);
     } else {
-      const future = data.filter(item => item.start.getTime() > now);
-      next = future[0] || null;
-      arriving = future[1] || null;
+      const cur = slots[currentIdx];
+      els.currentLabel.textContent = schedule.date || 'Selected date';
+      els.currentTime.textContent = cur.timeLabel;
+
+      const endLabel = minToLabel(endMinutes);
+      els.currentRange.textContent = `Until ${endLabel}`;
+
+      const minsLeft = Math.max(0, Math.ceil((endMinutes - now)));
+      els.minsRemaining.textContent = String(minsLeft);
+
+      pills(els.currentClubs, cur.clubs);
     }
 
-    renderBoard({ current, next, arriving, selectedDay, now: baseNow });
+    // NEXT
+    if (nextIdx === -1){
+      els.nextTime.textContent = '—';
+      pills(els.nextClubs, []);
+    } else {
+      const nxt = slots[nextIdx];
+      els.nextTime.textContent = nxt.timeLabel;
+      pills(els.nextClubs, nxt.clubs);
+    }
 
-    el("lastUpdated").textContent =
-      "Last update: " + new Date().toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", second:"2-digit" });
+    // ARRIVING
+    if (arrivingIdx === -1){
+      els.arrivingTime.textContent = '—';
+      pills(els.arrivingClubs, []);
+    } else {
+      const arr = slots[arrivingIdx];
+      els.arrivingTime.textContent = arr.timeLabel;
+      pills(els.arrivingClubs, arr.clubs);
+    }
 
-    setStatus(`OK • ${data.length} slots • ${selectedDay || "All days"}`);
-
-  } catch (err) {
-    setStatus("Error");
-    el("board").innerHTML =
-      `<div class="empty"><b>Could not load queue.</b><br>${escapeHtml(err.message || String(err))}</div>`;
-  }
-}
-
-/** Dropdown */
-function populateDayDropdown(days) {
-  const sel = el("daySel");
-  const saved = getSavedDay();
-
-  const sorted = days.slice().sort((a,b) => a.localeCompare(b));
-  sel.innerHTML = "";
-
-  // If no days found, still show placeholder
-  if (!sorted.length) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "No days";
-    sel.appendChild(opt);
-    return;
+    // footer
+    els.lastUpdated.textContent = `Updated: ${schedule.lastUpdated ? schedule.lastUpdated : '—'}`;
   }
 
-  for (const d of sorted) {
-    const opt = document.createElement("option");
-    opt.value = d;
-    opt.textContent = d;
-    sel.appendChild(opt);
+  async function fetchJSON(url){
+    const res = await fetch(url, { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+    }
+    return data;
   }
 
-  if (saved && sorted.includes(saved)) {
-    sel.value = saved;
-  } else {
-    sel.value = sorted[0];
+  async function loadDates(){
+    els.status.textContent = "Loading dates…";
+    const meta = await fetchJSON(`${API_BASE}?mode=meta`);
+    const dates = meta.dates || [];
+
+    clearNode(els.dateSelect);
+    if (dates.length === 0){
+      const opt = document.createElement('option');
+      opt.textContent = "No dates found";
+      els.dateSelect.appendChild(opt);
+      els.dateSelect.disabled = true;
+      els.refreshBtn.disabled = true;
+      els.status.innerHTML = `<span class="err">No Assigned Dates found in sheet "Info" (col F).</span>`;
+      return;
+    }
+
+    dates.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      els.dateSelect.appendChild(opt);
+    });
+
+    els.dateSelect.disabled = false;
+    els.refreshBtn.disabled = false;
+
+    // default to first date (or persist last selection)
+    const saved = localStorage.getItem("bmc_display_date");
+    if (saved && dates.includes(saved)) els.dateSelect.value = saved;
+
+    els.status.textContent = "Loading schedule…";
+    await loadScheduleForSelectedDate();
   }
-}
 
-/** Clock */
-function tickClock() {
-  const now = nowInTZ();
-  el("clock").textContent = now.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", second:"2-digit" });
-}
+  async function loadScheduleForSelectedDate(){
+    const date = els.dateSelect.value;
+    localStorage.setItem("bmc_display_date", date);
 
-el("daySel").addEventListener("change", () => {
-  saveDay(el("daySel").value);
-  fetchAndUpdate();
-});
+    els.status.textContent = `Loading schedule for ${date}…`;
+    const data = await fetchJSON(`${API_BASE}?date=${encodeURIComponent(date)}`);
 
-/** Init */
-tickClock();
-setInterval(tickClock, CONFIG.CLOCK_TICK_MS);
-fetchAndUpdate();
-setInterval(fetchAndUpdate, CONFIG.FETCH_EVERY_MS);
+    schedule.date = data.date;
+    schedule.slots = data.slots || [];
+    schedule.defaultLastSlotMinutes = data.defaultLastSlotMinutes || 10;
+    schedule.lastUpdated = new Date().toLocaleString();
+
+    els.status.textContent = `Loaded ${schedule.slots.length} slot(s) for ${date}`;
+    render();
+  }
+
+  // Clock + countdown tick
+  setInterval(() => {
+    els.nowClock.textContent = fmtClock(new Date());
+    render();
+  }, 1000);
+
+  // Periodic data refresh (keeps clubs updated if sheet changes)
+  setInterval(() => {
+    if (!els.dateSelect.disabled) loadScheduleForSelectedDate().catch(() => {});
+  }, 60000);
+
+  els.dateSelect.addEventListener('change', () => {
+    loadScheduleForSelectedDate().catch(err => {
+      els.status.innerHTML = `<span class="err">${err.message}</span>`;
+    });
+  });
+
+  els.refreshBtn.addEventListener('click', () => {
+    loadScheduleForSelectedDate().catch(err => {
+      els.status.innerHTML = `<span class="err">${err.message}</span>`;
+    });
+  });
+
+  // Init
+  (async function init(){
+    try {
+      if (!API_BASE || API_BASE.includes("https://script.google.com/a/macros/bishopmoore.org/s/AKfycbxupx-ve0SwiESEanmV6jTkL6lL6kiD5uupE_lU1b20qVoaxahBWg6RNcByCPuDXUa_/exec")) {
+        els.status.innerHTML = `<span class="err">Set API_BASE to your Apps Script Web App URL.</span>`;
+        return;
+      }
+      await loadDates();
+    } catch (err) {
+      els.status.innerHTML = `<span class="err">${err.message}</span>`;
+    }
+  })();
 </script>
 </body>
 </html>
