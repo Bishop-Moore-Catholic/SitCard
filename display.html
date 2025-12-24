@@ -177,7 +177,7 @@
     /* TICKER */
     .ticker{
       display: grid;
-      grid-template-columns: auto 1fr;
+      grid-template-columns: max-content 1fr;
       align-items: center;
       gap: 14px;
       border: 1px solid var(--border);
@@ -185,6 +185,36 @@
       border-radius: 18px;
       padding: 12px 14px;
       overflow: hidden;
+      align-items: center;
+    }
+
+    /* Left fixed "Next" area — auto sized */
+    .tickerLeft{
+      display: inline-grid;
+      grid-auto-flow: column;
+      grid-auto-columns: max-content;
+      align-items: center;
+      gap: 12px;
+      padding-right: 14px;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    /* Holds the Next club chips */
+    .tickerFixed{
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    /* Right scrolling area */
+    .tickerRight{
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
     }
 
     .tickerLabel{
@@ -233,6 +263,19 @@
     @keyframes tickerMove{
       from { transform: translateX(0); }
       to   { transform: translateX(-50%); }
+    }
+
+    /* Mobile: stack if needed */
+    @media (max-width: 900px){
+      .ticker{
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .tickerLeft{
+        border-right: none;
+        padding-right: 0;
+        min-width: 0;
+      }
     }
 
     .footer{
@@ -327,14 +370,23 @@
 
       <!-- TICKER (bottom) -->
       <div class="ticker" aria-label="Upcoming slots">
-        <div class="tickerLabel">Arriving</div>
-        <div class="tickerViewport">
-          <div class="tickerTrack" id="tickerTrack">
-            <div class="tickerItem muted">Loading…</div>
+        <div class="tickerLeft">
+          <div class="tickerLabel">Next</div>
+          <div class="tickerFixed" id="tickerNextFixed">
+            <div class="tickerItem muted">—</div>
+          </div>
+        </div>
+
+        <div class="tickerRight">
+          <div class="tickerLabel">Arriving</div>
+          <div class="tickerViewport">
+            <div class="tickerTrack" id="tickerTrack">
+              <div class="tickerItem muted">Loading…</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
 
     <div class="footer">
       <div>Data source: Apps Script</div>
@@ -441,6 +493,30 @@
     return items;
   }
 
+  function renderNextFixed(nextSlot){
+    const box = document.getElementById("tickerNextFixed");
+    if (!box) return;
+
+    if (!nextSlot){
+      box.innerHTML = `<div class="tickerItem muted">—</div>`;
+      return;
+    }
+
+    // Show time + each club as separate chips (or one chip if you prefer)
+    const clubs = nextSlot.clubs || [];
+    const chips = clubs.length
+      ? clubs.map(c => `
+          <div class="tickerItem">
+            <span class="tickerTime">${escapeHTML(nextSlot.timeLabel)}</span>
+            <span class="tickerSep">•</span>
+            <span>${escapeHTML(c)}</span>
+          </div>
+        `).join("")
+      : `<div class="tickerItem"><span class="tickerTime">${escapeHTML(nextSlot.timeLabel)}</span><span class="tickerSep">•</span><span>—</span></div>`;
+
+    box.innerHTML = chips;
+  }
+
   function renderTicker(items){
     const track = els.tickerTrack;
     if (!track) return;
@@ -535,7 +611,13 @@
     }
 
     // TICKER: everything from NEXT onward
-    const tickerItems = (nextIdx !== -1) ? buildTickerItems(slots, nextIdx) : [];
+    // FIXED NEXT (left)
+    const nextSlot = (nextIdx !== -1) ? slots[nextIdx] : null;
+    renderNextFixed(nextSlot);
+
+    // SCROLLING ARRIVING+ (right) -> start AFTER next slot
+    const startIdx = (nextIdx !== -1) ? nextIdx + 1 : -1;
+    const tickerItems = (startIdx !== -1) ? buildTickerItems(slots, startIdx) : [];
     renderTicker(tickerItems);
 
     // Footer
