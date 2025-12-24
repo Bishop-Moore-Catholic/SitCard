@@ -247,6 +247,32 @@
     .mono{ font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
     .muted{ color: var(--muted); }
     .err{ color: #b91c1c; }
+
+    /* Fullscreen video modal overlay */
+    .videoModal{
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #000;
+      display: none;
+    }
+
+    .videoModal.show{
+      display: grid;
+      place-items: center;
+    }
+
+    .videoModalInner{
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .videoModal video{
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* fill screen like a TV bumper */
+      background: #000;
+    }
   </style>
 </head>
 
@@ -306,6 +332,15 @@
     <div class="footer">
       <div>Data source: Apps Script</div>
       <div class="mono" id="lastUpdated">Updated: —</div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Instructions Video Modal -->
+  <div id="videoModal" class="videoModal" aria-hidden="true">
+    <div class="videoModalInner">
+      <video id="instructionVideo" playsinline preload="auto" muted>
+        <source src="https://github.com/Bishop-Moore-Catholic/SitCard/raw/refs/heads/main/Instructions.mp4" type="video/mp4">
+      </video>
     </div>
   </div>
 
@@ -588,6 +623,101 @@
       els.status.innerHTML = `<span class="err">${err.message}</span>`;
     }
   })();
+
+  // ---- Instructions Video Modal (plays once per minute) ----
+  const INSTRUCTIONS_VIDEO_URL =
+    "https://github.com/Bishop-Moore-Catholic/SitCard/raw/refs/heads/main/Instructions.mp4";
+
+  // Play once per minute:
+  const INSTRUCTIONS_INTERVAL_MS = 60_000;
+
+  // Small delay after page load before first run (optional safety)
+  const INSTRUCTIONS_FIRST_DELAY_MS = 15_000;
+
+  let isVideoPlaying = false;
+  let lastVideoStart = 0;
+
+  function setupInstructionsVideo(){
+    const modal = document.getElementById("videoModal");
+    const video = document.getElementById("instructionVideo");
+    if (!modal || !video) return;
+
+    // Ensure correct source (in case HTML was edited)
+    if (video.currentSrc === "" && video.querySelector("source")){
+      video.querySelector("source").src = INSTRUCTIONS_VIDEO_URL;
+      video.load();
+    }
+
+    function showModal(){
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function hideModal(){
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    function stopAndHide(){
+      try {
+        video.pause();
+        video.currentTime = 0;
+      } catch (_) {}
+      hideModal();
+      isVideoPlaying = false;
+    }
+
+    async function playOnce(){
+      // Prevent stacking / over-triggering
+      const now = Date.now();
+      if (isVideoPlaying) return;
+      if (now - lastVideoStart < 30_000) return; // hard guard (video is 33s)
+
+      isVideoPlaying = true;
+      lastVideoStart = now;
+
+      showModal();
+
+      try {
+        // Restart cleanly
+        video.pause();
+        video.currentTime = 0;
+
+        // Try to play. (Should work on signage/desktop; on iOS may require user interaction.)
+        await video.play();
+      } catch (err) {
+        // If autoplay fails, fall back gracefully
+        console.warn("Instruction video autoplay failed:", err);
+        stopAndHide();
+        return;
+      }
+    }
+
+    // When video ends, hide
+    video.addEventListener("ended", () => {
+      stopAndHide();
+    });
+
+    // If video errors, hide
+    video.addEventListener("error", () => {
+      console.warn("Instruction video error.");
+      stopAndHide();
+    });
+
+    // Optional: allow ESC to close (for testing)
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isVideoPlaying) stopAndHide();
+    });
+
+    // Kick off schedule
+    setTimeout(() => {
+      playOnce(); // first play
+      setInterval(playOnce, INSTRUCTIONS_INTERVAL_MS);
+    }, INSTRUCTIONS_FIRST_DELAY_MS);
+  }
+
+  // Call it once after page init
+  setupInstructionsVideo();
 </script>
 </body>
 </html>
