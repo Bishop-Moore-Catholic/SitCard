@@ -44,9 +44,7 @@
   }
 
   @media (max-width: 720px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
+    .grid { grid-template-columns: 1fr; }
   }
 
   .card {
@@ -73,71 +71,96 @@
     text-decoration: none;
     background: var(--blue);
     color: #fff;
-    transition: transform 80ms ease, background 120ms ease;
   }
 
-  a.btn:hover {
-    background: #1e53c7;
-  }
-
-  a.btn:active {
-    transform: translateY(1px);
-  }
-
-  .btnSecondary {
+  a.btnSecondary {
     background: #ffffff;
     color: var(--text);
     border: 1px solid var(--border);
   }
 
-  .btnSecondary:hover {
-    background: #eef3fb;
+  .qr {
+    display: flex;
+    justify-content: center;
+  }
+
+  .qr canvas {
+    width: 96px !important;
+    height: 96px !important;
   }
 </style>
+
+<!-- QRCode.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
-  <div class="wrap">
-    <h1>SitCard Dashboard</h1>
+<div class="wrap">
+  <h1>SitCard Dashboard</h1>
 
-    <div class="grid">
+  <div class="grid">
 
-      <div class="card">
-        <div class="title">Student QR Generator</div>
-        <a class="btn" target="_blank" rel="noopener"
-           href="https://bishop-moore-catholic.github.io/SitCard/">
-          Open
-        </a>
-      </div>
-
-      <div class="card">
-        <div class="title">Scanner (Apps Script)</div>
-        <a class="btn" target="_blank" rel="noopener"
-           href="https://script.google.com/a/macros/bishopmoore.org/s/AKfycbxuXiH9-xMnKdR4RC8DZpdR9JokeO8mI6RN4D-YGM1se4UdewQp800iW00BAIAe_FXN4A/exec">
-          Open
-        </a>
-      </div>
-
-      <div class="card">
-        <div class="title">QR Test Generator</div>
-        <a class="btn" target="_blank" rel="noopener"
-           href="https://bishop-moore-catholic.github.io/SitCard/QR-test.html">
-          Open
-        </a>
-      </div>
-
-      <div class="card">
-        <div class="title">Queue Display</div>
-        <a class="btn" target="_blank" rel="noopener"
-           href="https://bishop-moore-catholic.github.io/SitCard/display">
-          Open
-        </a>
-        <a class="btn btnSecondary" target="_blank" rel="noopener"
-           href="https://bishop-moore-catholic.github.io/SitCard/display?video=0">
-          Open (Video Off)
-        </a>
-      </div>
+    <!-- Student QR Generator -->
+    <div class="card">
+      <div class="title">Student QR Generator</div>
+      <a class="btn" target="_blank"
+         href="https://bishop-moore-catholic.github.io/SitCard/">Open</a>
+      <div class="qr" id="qr-generator"></div>
     </div>
+
+    <!-- Scanner -->
+    <div class="card">
+      <div class="title">Scanner (Apps Script)</div>
+      <a class="btn" target="_blank"
+         href="https://script.google.com/a/macros/bishopmoore.org/s/AKfycbxuXiH9-xMnKdR4RC8DZpdR9JokeO8mI6RN4D-YGM1se4UdewQp800iW00BAIAe_FXN4A/exec">
+         Open
+      </a>
+      <div class="qr" id="qr-scanner"></div>
+    </div>
+
+    <!-- QR Test -->
+    <div class="card">
+      <div class="title">QR Test Generator</div>
+      <a class="btn" target="_blank"
+         href="https://bishop-moore-catholic.github.io/SitCard/QR-test.html">
+         Open
+      </a>
+      <div class="qr" id="qr-test"></div>
+    </div>
+
+    <!-- Display -->
+    <div class="card">
+      <div class="title">Queue Display</div>
+      <a class="btn" target="_blank"
+         href="https://bishop-moore-catholic.github.io/SitCard/display">
+         Open
+      </a>
+      <a class="btn btnSecondary" target="_blank"
+         href="https://bishop-moore-catholic.github.io/SitCard/display?video=0">
+         Open (Video Off)
+      </a>
+      <div class="qr" id="qr-display"></div>
+    </div>
+
   </div>
+</div>
+
+<script>
+  const links = {
+    "qr-generator": "https://bishop-moore-catholic.github.io/SitCard/",
+    "qr-scanner": "https://script.google.com/a/macros/bishopmoore.org/s/AKfycbxuXiH9-xMnKdR4RC8DZpdR9JokeO8mI6RN4D-YGM1se4UdewQp800iW00BAIAe_FXN4A/exec",
+    "qr-test": "https://bishop-moore-catholic.github.io/SitCard/QR-test.html",
+    "qr-display": "https://bishop-moore-catholic.github.io/SitCard/display"
+  };
+
+  Object.entries(links).forEach(([id, url]) => {
+    new QRCode(document.getElementById(id), {
+      text: url,
+      width: 96,
+      height: 96,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+</script>
 </body>
 </html>
