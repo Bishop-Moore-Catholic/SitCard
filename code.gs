@@ -67,6 +67,7 @@ function setupYearbookScannerSheets() {
   sh.setColumnWidth(12, 360); // QRRawPayload
   sh.setColumnWidth(14, 260); // Notes
   sh.getRange(1, 1, sh.getMaxRows(), neededCols).setWrap(true);
+  sh.getRange("A:A").setNumberFormat("yyyy-mm-dd hh:mm:ss");
 
   SpreadsheetApp.flush();
   return { ok: true, sheet: SHEET_SCANS, columns: neededCols };
