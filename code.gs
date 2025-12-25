@@ -81,15 +81,26 @@ function getClientConfig() {
 }
 
 /**
- * Record a scan with LOCAL counters from the client.
+ * BATCHED + NO DUP DETECTION
  *
- * payloadRaw can be:
- *  - JSON string {"sid":"20xxxxx","f":"...","l":"..."} (lean QR) OR {"id":"20xxxxx","first":"...","last":"..."}  (from QR)
- *  - ID-only "20xxxxx" (manual)
+ * Client should call:
+ *   recordScansBatch(scansArray)
  *
- * rowNumber/rowPosition/sessionId/club come from the client.
+ * where scansArray is an array of objects like:
+ * {
+ *   payloadRaw: "...", club: "...", notes: "...",
+ *   rowNumber: 1, rowPosition: 12,
+ *   sessionId: "SESSION-...", gradYearParam: 2026, gradeParam: 12,
+ *   clientId: "optional-id-to-match-results"
+ * }
+ *
+ * This function:
+ *  - does NOT check duplicates (scanner handles it)
+ *  - appends rows in ONE write (setValues) for speed/quota safety
+ *  - still rejects invalid JSON payloads (won't write them)
+ *  - still writes INVALID_ID rows (so you can audit)
  */
-function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId, gradYearParam, gradeParam) {
+function recordScansBatch(scansArray) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
 
@@ -99,85 +110,172 @@ function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId, 
     if (!sh) throw new Error("Scans sheet missing. Run setupYearbookScannerSheets().");
 
     const operator = Session.getActiveUser().getEmail() || "Unknown";
-    const ts = new Date();
+    const now = new Date();
 
-    const raw = String(payloadRaw || "").trim();
-    const sid = String(sessionId || "").trim() || ("SESSION-" + Utilities.getUuid().slice(0, 8).toUpperCase());
-    const clubSafe = String(club || "").trim();
-    const notesSafe = String(notes || "").trim();
-    const rowNum = Number(rowNumber || 1);
-    const rowPos = Number(rowPosition || 0);
+    const scans = Array.isArray(scansArray) ? scansArray : [];
+    if (scans.length === 0) {
+      return { ok: true, status: "OK", operator, appended: 0, results: [] };
+    }
 
-    // Parse payload (JSON or ID-only)
-    let obj;
-    let payloadIsIdOnly = false;
+    // Safety guard: keep batches reasonable (client should also limit)
+    const MAX_BATCH = 50;
+    const batch = scans.slice(0, MAX_BATCH);
 
-    if (STUDENT_ID_REGEX.test(raw)) {
-      payloadIsIdOnly = true;
-      obj = { id: raw, first: "", last: "", grade: "", gradYear: "" };
-    } else {
-      try {
-        obj = JSON.parse(raw);
-      } catch (e) {
-        // Do NOT write invalid JSON to the sheet
-        // Client will handle position rollback
-        return { ok: false, status: "INVALID_JSON", message: "Invalid QR payload (ignored)." };
+    const rowsToAppend = [];
+    const results = [];
+
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i] || {};
+      const t = new Date(now.getTime()); // one timestamp per row (same ms is fine)
+      const raw = String(item.payloadRaw || "").trim();
+
+      const sid =
+        String(item.sessionId || "").trim() ||
+        ("SESSION-" + Utilities.getUuid().slice(0, 8).toUpperCase());
+
+      const clubSafe  = String(item.club || "").trim();
+      const notesSafe = String(item.notes || "").trim();
+
+      const rowNum = Number(item.rowNumber || 1);
+      const rowPos = Number(item.rowPosition || 0);
+
+      const clientId = item.clientId != null ? String(item.clientId) : "";
+
+      // Parse payload (JSON or ID-only)
+      let obj;
+      let payloadMode = "JSON";
+      if (STUDENT_ID_REGEX.test(raw)) {
+        payloadMode = "ID_ONLY";
+        obj = { id: raw, first: "", last: "", grade: "", gradYear: "" };
+      } else {
+        try {
+          obj = JSON.parse(raw);
+        } catch (e) {
+          // DO NOT write invalid JSON rows (per your original behavior)
+          results.push({
+            clientId,
+            ok: false,
+            status: "INVALID_JSON",
+            message: "Invalid QR payload (ignored)."
+          });
+          continue;
+        }
       }
+
+      const studentId = String(obj.id || obj.studentId || obj.sid || "").trim();
+      const firstName = String(obj.first || obj.firstName || obj.f || "").trim();
+      const lastName  = String(obj.last  || obj.lastName  || obj.l || "").trim();
+
+      const gradeVal    = (item.gradeParam ?? obj.grade ?? obj.Grade ?? "");
+      const gradYearVal = (item.gradYearParam ?? obj.gradYear ?? obj.graduationYear ?? obj.grad_year ?? "");
+
+      let grade = String(gradeVal).trim();
+      let gradYear = String(gradYearVal).trim();
+
+      // If missing, infer from StudentID prefix (first 4 digits = gradYear)
+      if (!gradYear && /^\d{4}/.test(studentId)) {
+        gradYear = studentId.slice(0, 4);
+      }
+
+      // If grade still missing and gradYear is valid, infer grade for current school year
+      if (!grade && /^\d{4}$/.test(gradYear)) {
+        const gy = Number(gradYear);
+        const y = now.getFullYear();
+        const mo = now.getMonth(); // 0=Jan
+        const schoolYearEnds = (mo >= 6) ? (y + 1) : y; // July rollover
+        const g = 12 - (gy - schoolYearEnds);
+        if (g >= 9 && g <= 12) grade = String(g);
+      }
+
+      // Validate StudentID (we still WRITE the row with INVALID_ID so you can audit)
+      if (!STUDENT_ID_REGEX.test(studentId)) {
+        rowsToAppend.push([
+          t, sid, clubSafe, operator, rowNum, rowPos,
+          studentId, firstName, lastName, grade, gradYear,
+          raw, "INVALID_ID", notesSafe
+        ]);
+        results.push({
+          clientId,
+          ok: false,
+          status: "INVALID_ID",
+          message: "StudentID failed validation.",
+          student: { studentId, firstName, lastName, grade, gradYear },
+          payloadMode
+        });
+        continue;
+      }
+
+      // OK row (NO DUP CHECK)
+      rowsToAppend.push([
+        t, sid, clubSafe, operator, rowNum, rowPos,
+        studentId, firstName, lastName, grade, gradYear,
+        raw, "OK", notesSafe
+      ]);
+
+      results.push({
+        clientId,
+        ok: true,
+        status: "OK",
+        student: { studentId, firstName, lastName, grade, gradYear },
+        payloadMode
+      });
     }
 
-    const studentId = String(obj.id || obj.studentId || obj.sid || "").trim();
-    const firstName = String(obj.first || obj.firstName || obj.f || "").trim();
-    const lastName  = String(obj.last  || obj.lastName  || obj.l || "").trim();
-
-    // Accept numeric or string values; store as clean strings
-    const gradeVal = (gradeParam ?? obj.grade ?? obj.Grade ?? "");
-    const gradYearVal = (gradYearParam ?? obj.gradYear ?? obj.graduationYear ?? obj.grad_year ?? "");
-
-    let grade = String(gradeVal).trim();
-    let gradYear = String(gradYearVal).trim();
-
-    // If missing, infer from StudentID prefix (first 4 digits = gradYear)
-    if (!gradYear && /^\d{4}/.test(studentId)) {
-      gradYear = studentId.slice(0, 4);
+    // One append for the whole batch
+    if (rowsToAppend.length) {
+      const startRow = sh.getLastRow() + 1;
+      sh.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
     }
-
-    // If grade still missing and gradYear is valid, infer grade for current school year
-    if (!grade && /^\d{4}$/.test(gradYear)) {
-      const gy = Number(gradYear);
-      const now = new Date();
-      const y = now.getFullYear();
-      const mo = now.getMonth(); // 0=Jan
-      const schoolYearEnds = (mo >= 6) ? (y + 1) : y; // July rollover
-      const g = 12 - (gy - schoolYearEnds);
-      if (g >= 9 && g <= 12) grade = String(g);
-    }
-
-    if (!STUDENT_ID_REGEX.test(studentId)) {
-      sh.appendRow([ts, sid, clubSafe, operator, rowNum, rowPos, studentId, firstName, lastName, grade, gradYear, raw, "INVALID_ID", notesSafe]);
-      return { ok: false, status: "INVALID_ID", message: "StudentID failed validation." };
-    }
-
-    // Server-side duplicate protection (session + studentId)
-    const cache = CacheService.getScriptCache();
-    const dupKey = `dup:${sid}:${studentId}`;
-    if (cache.get(dupKey)) {
-      sh.appendRow([ts, sid, clubSafe, operator, rowNum, rowPos, studentId, firstName, lastName, grade, gradYear, raw, "DUPLICATE", notesSafe]);
-      return { ok: true, status: "DUPLICATE", message: "Duplicate scan (recent).", operator };
-    }
-    cache.put(dupKey, "1", DUP_WINDOW_SECONDS);
-
-    // Write OK row
-    sh.appendRow([ts, sid, clubSafe, operator, rowNum, rowPos, studentId, firstName, lastName, grade, gradYear, raw, "OK", notesSafe]);
 
     return {
       ok: true,
       status: "OK",
       operator,
-      session: { SessionID: sid, RowNumber: rowNum, RowPostion: rowPos },
-      student: { studentId, firstName, lastName, grade, gradYear },
-      payloadMode: payloadIsIdOnly ? "ID_ONLY" : "JSON"
+      received: scans.length,
+      processed: batch.length,
+      appended: rowsToAppend.length,
+      results
     };
   } finally {
     lock.releaseLock();
   }
+}
+
+
+/**
+ * Backward-compatible single-scan entry point.
+ * Uses the batched path (still no dup detection).
+ */
+function recordScan(payloadRaw, club, notes, rowNumber, rowPosition, sessionId, gradYearParam, gradeParam) {
+  const res = recordScansBatch([{
+    payloadRaw, club, notes,
+    rowNumber, rowPosition,
+    sessionId, gradYearParam, gradeParam,
+    clientId: "" // optional
+  }]);
+
+  // Mirror your old return shape as closely as possible:
+  const r0 = (res && res.results && res.results[0]) ? res.results[0] : null;
+
+  if (!r0) return { ok: true, status: "OK", operator: res.operator, message: "No-op." };
+
+  if (r0.status === "OK") {
+    return {
+      ok: true,
+      status: "OK",
+      operator: res.operator,
+      student: r0.student,
+      payloadMode: r0.payloadMode
+    };
+  }
+
+  // INVALID_JSON is not written; INVALID_ID is written
+  return {
+    ok: false,
+    status: r0.status,
+    message: r0.message || r0.status,
+    operator: res.operator,
+    student: r0.student || null,
+    payloadMode: r0.payloadMode
+  };
 }

@@ -14,9 +14,7 @@
   }
 
   /* OK background flash */
-  body.bg-ok {
-    background-color: #00e36a; /* subtle green */
-  }
+  body.bg-ok { background-color: #00e36a; }
   .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
   .card { background: #ffffff; border: 1px solid #d7e0ee; border-radius: 14px; padding: 14px; }
   label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
@@ -59,7 +57,6 @@
     background: #000;
   }
 
-  /* Lock visual orientation */
   .videoWrap video {
     width: 100%;
     height: auto;
@@ -96,6 +93,14 @@
     max-width: 280px;
   }
   select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
+
+  /* Queue warning line */
+  .queueLine { margin-top: 6px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+  .qPill { border-color:#c6d2e6; }
+  .qGood { color:#0f8a4c; border-color:#9ae6b4; background:#f0fff4; }
+  .qWarn { color:#b45309; border-color:#fcd34d; background:#fffbeb; }
+  .qSev  { color:#7c2d12; border-color:#fdba74; background:#fff7ed; }
+  .qBad  { color:#b91c1c; border-color:#fca5a5; background:#fef2f2; }
 </style>
 
   <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
@@ -166,7 +171,13 @@
 
     <div class="history">
       <div style="font-weight:700;">Recent scans (local)</div>
-      <div class="tiny">Last 10 scans on this device (clears when you start a new club/session).</div>
+      <div class="tiny">Last 10 successful scans recorded on this device (clears when you start a new club/session).</div>
+
+      <div class="queueLine tiny" id="queueInfo">
+        <span class="pill mono qPill" id="queuePill">Queue: <span id="queueCount">0</span></span>
+        <span class="tiny" id="queueHint"></span>
+      </div>
+
       <div id="historyList"></div>
     </div>
   </div>
@@ -216,6 +227,9 @@
     notes: document.getElementById("notes"),
     btnSubmitManual: document.getElementById("btnSubmitManual"),
     btnClearManual: document.getElementById("btnClearManual"),
+    queuePill: document.getElementById("queuePill"),
+    queueCount: document.getElementById("queueCount"),
+    queueHint: document.getElementById("queueHint"),
   };
 
   // ---- flash feedback (priority + lock) ----
@@ -225,15 +239,11 @@
 
   function flash(kind) {
     if (!els.flashOverlay) return;
-
     const now = Date.now();
 
     // If OK flash is active, ignore DUP/ERR until it clears
-    if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") {
-      return;
-    }
+    if (flashLockedKind === "ok" && now < flashLockedUntil && kind !== "ok") return;
 
-    // Reset overlay (Safari-safe)
     els.flashOverlay.style.opacity = "0";
     els.flashOverlay.className = "";
     void els.flashOverlay.offsetHeight;
@@ -247,12 +257,8 @@
       kind === "err" ? 1000 :
       200;
 
-    // === PAGE BACKGROUND FLASH (OK ONLY) ===
-    if (kind === "ok") {
-      document.body.classList.add("bg-ok");
-    }
+    if (kind === "ok") document.body.classList.add("bg-ok");
 
-    // Lock only for OK flashes
     if (kind === "ok") {
       flashLockedKind = "ok";
       flashLockedUntil = now + duration;
@@ -264,7 +270,6 @@
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => {
       els.flashOverlay.style.opacity = "0";
-
       if (kind === "ok") {
         document.body.classList.remove("bg-ok");
         flashLockedKind = "";
@@ -291,11 +296,9 @@
     els.sessionTop.textContent = state.sessionId;
     els.rowNum.textContent = String(state.row);
     els.rowPos.textContent = String(state.pos);
-
-    // lock UI
     els.club.disabled = state.clubLocked;
     els.btnSaveClub.disabled = state.clubLocked;
-    els.btnStartCam.disabled = !state.clubLocked ? false : els.btnStartCam.disabled; // no-op; keep manual button control elsewhere
+    els.btnStartCam.disabled = !state.clubLocked ? false : els.btnStartCam.disabled;
   }
 
   // ---- UI helpers ----
@@ -323,10 +326,7 @@
 
   function showScanningClub() {
     const club = (state.club || "").trim();
-    if (!club) {
-      showStatus({ status: "OK", message: "No club selected. Enter a club and press Save Club." });
-      return;
-    }
+    if (!club) return showStatus({ status: "OK", message: "No club selected. Enter a club and press Save Club." });
     showStatus({ status: "OK", message: `Scanning club: ${club}` });
   }
 
@@ -334,22 +334,11 @@
   const history = [];
   const HISTORY_MAX = 10;
 
-  function clearHistory() {
-    history.length = 0;
-    renderHistory();
-  }
+  function clearHistory() { history.length = 0; renderHistory(); }
 
   function pushHistory(item) {
     history.unshift(item);
     while (history.length > HISTORY_MAX) history.pop();
-    renderHistory();
-  }
-
-  function updateHistoryStatus(hid, newStatus, newId) {
-    const h = history.find(x => x && x._hid === hid);
-    if (!h) return;
-    h.status = newStatus;
-    if (newId) h.id = newId;
     renderHistory();
   }
 
@@ -359,7 +348,7 @@
       const empty = document.createElement("div");
       empty.className = "tiny";
       empty.style.marginTop = "8px";
-      empty.textContent = "No scans yet for this club/session.";
+      empty.textContent = "No successful scans recorded yet for this club/session.";
       els.historyList.appendChild(empty);
       return;
     }
@@ -371,13 +360,7 @@
       const left = document.createElement("div");
       left.className = "historyLeft";
 
-      const s = String(h.status || "").toUpperCase();
-      const cls =
-        (s === "OK") ? "good" :
-        (s.startsWith("DUPLICATE") || s === "QUEUED") ? "warn" :
-        "bad";
-
-      left.appendChild(pill(h.status, cls));
+      left.appendChild(pill("OK", "good"));
       left.appendChild(pill(h.id || "—"));
       left.appendChild(pill(`R${h.row} P${h.pos}`));
 
@@ -397,10 +380,7 @@
   const COOLDOWN_MS = 1200;
   const HARD_SUPPRESS_SAME_AS_PREV = true;
 
-  function resetLocalDuplicateMemory() {
-    lastRaw = "";
-    lastAt = 0;
-  }
+  function resetLocalDuplicateMemory() { lastRaw = ""; lastAt = 0; }
 
   function shouldSendRaw(raw) {
     const now = Date.now();
@@ -429,14 +409,9 @@
 
   function inferGradeFromGradYear(gradYear, asOf = new Date()) {
     if (!Number.isFinite(gradYear)) return null;
-
     const y = asOf.getFullYear();
-    const m = asOf.getMonth(); // 0=Jan ... 11=Dec
-
-    // July rollover: after June, we consider the new school year started
+    const m = asOf.getMonth();
     const schoolYearEnds = (m >= 6) ? (y + 1) : y;
-
-    // In the school year ending in gradYear, student is 12th grade
     const grade = 12 - (gradYear - schoolYearEnds);
     return (grade >= 9 && grade <= 12) ? grade : null;
   }
@@ -453,78 +428,152 @@
       [fn].apply(null, args);
   }
 
-  // ---- async send queue (non-blocking scanner) ----
-  const SENDQ_KEY = "yearbook.scanSendQueue.v1";
+  // ---- async send queue (BATCHED, localStorage-backed) ----
+  const SENDQ_KEY = "yearbook.scanSendQueue.v3";
+  const BATCH_SIZE = 15;
+  const FLUSH_EVERY_MS = 900;
+
   let sendQueue = [];
   let isFlushing = false;
+
+  function updateQueueUI() {
+    const n = sendQueue.length;
+    if (els.queueCount) els.queueCount.textContent = String(n);
+    if (!els.queuePill) return;
+
+    els.queuePill.className = "pill mono qPill";
+    const offline = (typeof navigator !== "undefined" && navigator.onLine === false);
+
+    let hint = "";
+    if (offline) {
+      hint = "Offline — will upload when back online.";
+      els.queuePill.classList.add("qBad");
+    } else if (n === 0) {
+      hint = "All caught up.";
+      els.queuePill.classList.add("qGood");
+    } else if (n < 25) {
+      hint = "Uploading normally.";
+      els.queuePill.classList.add("qWarn");
+    } else if (n < 50) {
+      hint = "Queue backing up — check Wi-Fi.";
+      els.queuePill.classList.add("qSev");
+    } else {
+      hint = "Queue very large — pause scanning or fix network.";
+      els.queuePill.classList.add("qBad");
+    }
+
+    if (els.queueHint) els.queueHint.textContent = hint;
+  }
+
+  function serializeQueueItem(it) {
+    return {
+      t: it.t || Date.now(),
+      payload: String(it.payload || "").trim(),
+      studentIdGuess: String(it.studentIdGuess || "").trim(),
+      club: String(it.club || "").trim(),
+      notes: String(it.notes || "").trim(),
+      row: Number(it.row || 1),
+      pos: Number(it.pos || 0),
+      sessionId: String(it.sessionId || "").trim(),
+      gradYear: it.gradYear ?? null,
+      grade: it.grade ?? null
+    };
+  }
 
   function loadSendQueue() {
     try {
       const raw = localStorage.getItem(SENDQ_KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      sendQueue = Array.isArray(arr) ? arr : [];
-    } catch {
-      sendQueue = [];
-    }
+      sendQueue = Array.isArray(arr) ? arr.map(serializeQueueItem) : [];
+    } catch { sendQueue = []; }
+    updateQueueUI();
   }
 
   function saveSendQueue() {
-    try { localStorage.setItem(SENDQ_KEY, JSON.stringify(sendQueue)); } catch {}
+    try { localStorage.setItem(SENDQ_KEY, JSON.stringify(sendQueue.map(serializeQueueItem))); } catch {}
+    updateQueueUI();
   }
 
-  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
   function enqueueSend(item) {
-    // item can include onResult; JSON stringify will drop it, so we persist only payload fields
-    sendQueue.push(item);
+    sendQueue.push(serializeQueueItem(item));
     saveSendQueue();
     flushSendQueue();
   }
 
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
   async function flushSendQueue() {
     if (isFlushing) return;
-    isFlushing = true;
+    if (!sendQueue.length) { updateQueueUI(); return; }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) { updateQueueUI(); return; }
 
+    isFlushing = true;
     try {
       while (sendQueue.length) {
-        const item = sendQueue[0];
+        const batch = sendQueue.slice(0, BATCH_SIZE);
+
+        const payload = batch.map(it => ({
+          payloadRaw: it.payload,
+          club: it.club,
+          notes: it.notes,
+          rowNumber: it.row,
+          rowPosition: it.pos,
+          sessionId: it.sessionId,
+          gradYearParam: it.gradYear,
+          gradeParam: it.grade,
+          clientId: ""
+        }));
 
         const res = await new Promise((resolve, reject) => {
-          gas(
-            "recordScan",
-            [
-              String(item.payload).trim(),
-              item.club,
-              item.notes || "",
-              item.row,
-              item.pos,
-              item.sessionId,
-              item.gradYear,
-              item.grade
-            ],
-            resolve,
-            reject
-          );
+          gas("recordScansBatch", [payload], resolve, reject);
         });
 
-        if (typeof item.onResult === "function") {
-          try { item.onResult(res); } catch {}
+        if (res?.operator) els.operatorTop.textContent = res.operator;
+
+        const results = Array.isArray(res?.results) ? res.results : [];
+
+        for (let i = 0; i < batch.length; i++) {
+          const it = batch[i];
+          const r = results[i] || { status: "ERROR" };
+          const status = String(r.status || "ERROR").toUpperCase();
+
+          if (status === "OK") {
+            pushHistory({
+              t: it.t,
+              id: (r.student?.studentId || it.studentIdGuess || "—"),
+              status: "OK",
+              row: it.row,
+              pos: it.pos
+            });
+          } else if (status === "INVALID_JSON") {
+            showStatus({ status: "INVALID_JSON", message: "Invalid QR payload (ignored)." });
+            flash("err");
+          } else if (status === "INVALID_ID") {
+            showStatus({ status: "INVALID_ID", message: "StudentID failed validation." });
+            flash("err");
+          } else {
+            showStatus({ status: "ERROR", message: "Server response: " + status });
+            flash("err");
+          }
         }
 
-        sendQueue.shift();
+        sendQueue.splice(0, batch.length);
         saveSendQueue();
 
-        await sleep(150); // throttle
+        await sleep(120);
       }
     } catch (err) {
-      console.warn("Queue flush failed; will retry.", err);
-      // leave queue intact, retry later
+      console.warn("Batch flush failed; will retry.", err);
       await sleep(1200);
     } finally {
       isFlushing = false;
-      if (sendQueue.length) flushSendQueue();
+      updateQueueUI();
     }
   }
+
+  setInterval(flushSendQueue, FLUSH_EVERY_MS);
+  window.addEventListener("online", () => { updateQueueUI(); flushSendQueue(); });
+  window.addEventListener("offline", () => { updateQueueUI(); });
 
   // ---- per-session dedupe by studentId (prevents dup increment + dup sends) ----
   const seenThisSession = new Set();
@@ -533,16 +582,15 @@
     return `${state.club}|${state.sessionId}|${String(studentId || "").trim()}`;
   }
 
-  // ---- scanner control (prevents freeze on New Club) ----
+  // ---- scanner control ----
   let scanner = null;
   let camRunning = false;
-
-  let selectedCameraId = ""; // deviceId
+  let selectedCameraId = "";
 
   async function refreshCameras(autoSelect = true) {
     if (typeof QrScanner === "undefined") return;
     try {
-      const cams = await QrScanner.listCameras(true); // request labels if permitted
+      const cams = await QrScanner.listCameras(true);
       const prev = els.camSelect.value || selectedCameraId || "";
       els.camSelect.innerHTML = "";
 
@@ -556,7 +604,6 @@
         return;
       }
 
-      // Build options
       cams.forEach((c, idx) => {
         const opt = document.createElement("option");
         opt.value = c.id;
@@ -566,7 +613,6 @@
 
       els.camSelect.disabled = false;
 
-      // Restore previous selection if possible
       const stillThere = cams.some(c => c.id === prev);
       const pick = stillThere ? prev : (autoSelect ? cams[0].id : "");
       els.camSelect.value = pick;
@@ -590,8 +636,7 @@
     QrScanner.WORKER_PATH = "https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js";
 
     try {
-      await stopCamera(true); // ensure clean start (destroys existing)
-
+      await stopCamera(true);
       await refreshCameras(false);
       selectedCameraId = els.camSelect && !els.camSelect.disabled ? (els.camSelect.value || selectedCameraId) : selectedCameraId;
 
@@ -604,10 +649,8 @@
           if (!shouldSendRaw(raw)) {
             flash("dup");
             showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (local suppression) — not sent." });
-            // pushHistory({ t: Date.now(), id: extractStudentId(raw), status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
             return;
           }
-
           logScan(raw, "camera");
         },
         {
@@ -646,7 +689,6 @@
       if (scanner) {
         scanner.stop();
         camRunning = false;
-
         if (destroy) {
           scanner.destroy();
           scanner = null;
@@ -655,7 +697,7 @@
     } catch (e) {}
   }
 
-  // ---- record scan (ASYNC / QUEUED) ----
+  // ---- record scan (ASYNC, BATCHED upload) ----
   function logScan(payload, source) {
     if (!state.clubLocked || !state.club) {
       showStatus({ status: "ERROR", message: "Save Club first (locks club + starts camera)." });
@@ -671,20 +713,16 @@
     if (!studentIdGuess) {
       flash("err");
       showStatus({ status: "INVALID_JSON", message: "Invalid QR (no StudentID detected) — not queued." });
-      // pushHistory({ t, id: "—", status: "INVALID_JSON", row: state.row, pos: state.pos });
       return;
     }
 
-    // Hard local dedupe by studentId for this session so position doesn't increment
     const key = makeSeenKey(studentIdGuess);
     if (seenThisSession.has(key)) {
       flash("dup");
       showStatus({ status: "DUPLICATE_LOCAL", message: "Duplicate (same student already scanned this session) — not queued." });
-      // pushHistory({ t, id: studentIdGuess, status: "DUPLICATE_LOCAL", row: state.row, pos: state.pos });
       return;
     }
 
-    // Commit immediately (non-blocking)
     const committedPos = state.pos + 1;
     state.pos = committedPos;
     seenThisSession.add(key);
@@ -693,69 +731,30 @@
     flash("ok");
     showStatus({ status: "QUEUED", message: "Queued… sending in background." });
 
-    const historyId = `${t}-${studentIdGuess}-${committedPos}`;
-    pushHistory({
-      t,
-      id: studentIdGuess,
-      status: "QUEUED",
-      row: state.row,
-      pos: committedPos,
-      _hid: historyId
-    });
-
-    // Manual button no longer needs to wait on server
-    if (source === "manual") {
-      els.btnSubmitManual.disabled = false;
-      els.btnSubmitManual.textContent = "Log";
-    }
-
     enqueueSend({
+      t,
       payload: raw,
+      studentIdGuess,
       club: state.club,
       notes: els.notes.value.trim(),
       row: state.row,
       pos: committedPos,
       sessionId: state.sessionId,
       gradYear,
-      grade,
-      onResult: (res) => {
-        if (res?.operator) els.operatorTop.textContent = res.operator;
-
-        // Update the existing history entry with server status
-        if (res?.status === "OK") {
-          updateHistoryStatus(historyId, "OK", res?.student?.studentId || studentIdGuess);
-          // optional: showStatus(res); // keep latest server message if you want
-        } else if (res?.status === "DUPLICATE") {
-          // updateHistoryStatus(historyId, "DUPLICATE_SERVER", res?.student?.studentId || studentIdGuess);
-          // optional: flash("dup");
-        } else if (res?.status === "INVALID_JSON") {
-          // updateHistoryStatus(historyId, "INVALID_JSON_SERVER", studentIdGuess);
-        } else if (res?.status) {
-          updateHistoryStatus(historyId, String(res.status), studentIdGuess);
-        } else {
-          updateHistoryStatus(historyId, "ERROR", studentIdGuess);
-        }
-      }
+      grade
     });
   }
 
   // ---- controls ----
   els.btnSaveClub.onclick = async () => {
     const clubText = els.club.value.trim();
-    if (!clubText) {
-      showStatus({ status: "ERROR", message: "Enter a club name first." });
-      return;
-    }
+    if (!clubText) return showStatus({ status: "ERROR", message: "Enter a club name first." });
 
     state.club = clubText;
     state.clubLocked = true;
-
-    // New session scope dedupe should be clean when club changes / session starts
     resetSeenThisSession();
-
     renderState();
     showScanningClub();
-
     await startCamera();
   };
 
@@ -769,7 +768,6 @@
     if (!ok) return;
 
     const wasRunning = camRunning;
-
     await stopCamera(true);
 
     state.sessionId = newSessionId();
@@ -798,10 +796,7 @@
   // manual
   function submitManual() {
     const id = els.manualId.value.trim();
-    if (!/^20\d{5}$/.test(id)) {
-      showStatus({status:"ERROR", message:"Enter a valid StudentID like 20xxxxx."});
-      return;
-    }
+    if (!/^20\d{5}$/.test(id)) return showStatus({status:"ERROR", message:"Enter a valid StudentID like 20xxxxx."});
     logScan(id, "manual");
     els.manualId.focus();
     els.manualId.select();
@@ -819,19 +814,11 @@
     showStatus({status:"OK", message: state.club ? `Camera stopped. Scanning club: ${state.club}` : "Camera stopped."});
   };
 
-  function freezeVideoOrientation() {
-    els.video.style.transform = "rotate(0deg)";
-  }
-
-  window.addEventListener("orientationchange", () => {
-    freezeVideoOrientation();
-  });
+  function freezeVideoOrientation() { els.video.style.transform = "rotate(0deg)"; }
+  window.addEventListener("orientationchange", () => { freezeVideoOrientation(); });
 
   // camera source controls
-  els.btnRefreshCams.onclick = async () => {
-    await refreshCameras(true);
-    showStatus({status:"OK", message:"Camera list refreshed."});
-  };
+  els.btnRefreshCams.onclick = async () => { await refreshCameras(true); showStatus({status:"OK", message:"Camera list refreshed."}); };
 
   els.camSelect.onchange = async () => {
     selectedCameraId = els.camSelect.value || "";
@@ -843,12 +830,12 @@
     }
   };
 
-  // init
+  // init (refresh resumes uploads automatically)
   renderState();
   clearHistory();
   loadSendQueue();
+  updateQueueUI();
   flushSendQueue();
-  setInterval(flushSendQueue, 2000);
 
   refreshCameras(true);
   showStatus({status:"OK", message:"Enter a club name, then press Save Club (locks + starts camera)."});
