@@ -4,106 +4,103 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
-<style>
-  :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-  body {
-    margin: 0;
-    padding: 16px;
-    background: #f6f8fb;
-    transition: background-color 180ms ease
-  }
 
-  /* OK background flash */
-  body.bg-ok { background-color: #00e36a; }
-  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
-  .card { background: #ffffff; border: 1px solid #d7e0ee; border-radius: 14px; padding: 14px; }
-  label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
-  input {
-    width: 100%; box-sizing: border-box; padding: 10px 12px;
-    border-radius: 12px; border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
-    outline: none;
-  }
-  input:disabled { opacity: .65; cursor: not-allowed; }
-  .toolbar { display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
-  .btn {
-    border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
-    border-radius: 12px; padding: 10px 12px; cursor: pointer;
-  }
-  .btn:active { transform: translateY(1px); }
-  .btn[disabled] { opacity: .55; cursor: not-allowed; }
-  .btnPrimary { background: #eaf2ff; border-color: #8fb3ff; }
-  .btnDanger  { background: #feecec; border-color: #f2a3a3; }
-  .btnBigPlus { font-size: 22px; padding: 10px 18px; border-radius: 14px; }
-  .btnSmallMinus { font-size: 14px; padding: 6px 10px; border-radius: 12px; opacity: .95; }
-  .pill { display:inline-flex; gap:10px; align-items:center; padding: 8px 10px; border: 1px solid #c6d2e6; border-radius: 999px; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-  .status { display:flex; gap:10px; flex-wrap:wrap; }
-  .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 16px; background: #f6f8fb; transition: background-color 180ms ease; }
+    body.bg-ok { background-color: #00e36a; }
+    .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+    .card { background: #ffffff; border: 1px solid #d7e0ee; border-radius: 14px; padding: 14px; }
+    label { font-size: 12px; opacity: .8; display:block; margin-bottom: 6px; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border-radius: 12px; border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
+      outline: none;
+    }
+    input:disabled { opacity: .65; cursor: not-allowed; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid #c6d2e6; background: #ffffff; color: #0f172a;
+      border-radius: 12px; padding: 10px 12px; cursor: pointer;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn[disabled] { opacity: .55; cursor: not-allowed; }
+    .btnPrimary { background: #eaf2ff; border-color: #8fb3ff; }
+    .btnDanger  { background: #feecec; border-color: #f2a3a3; }
+    .btnBigPlus { font-size: 22px; padding: 10px 18px; border-radius: 14px; }
+    .btnSmallMinus { font-size: 14px; padding: 6px 10px; border-radius: 12px; opacity: .95; }
+    .pill { display:inline-flex; gap:10px; align-items:center; padding: 8px 10px; border: 1px solid #c6d2e6; border-radius: 999px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .status { display:flex; gap:10px; flex-wrap:wrap; }
+    .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
+    .good { color: #0f8a4c; }
+    .warn { color: #b45309; }
+    .bad  { color: #b91c1c; }
+    .clubRow { display:flex; gap:12px; align-items:flex-end; flex-wrap: wrap; }
+    .clubRow > .grow { flex: 1 1 320px; }
+    .rowpos { display:flex; gap:10px; align-items:center; padding-bottom: 2px; flex-wrap: wrap; }
+    .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
+    .tiny { font-size: 12px; opacity: .75; }
 
-  .good { color: #0f8a4c; }
-  .warn { color: #b45309; }
-  .bad  { color: #b91c1c; }
+    .videoWrap { position: relative; border-radius: 14px; overflow: hidden; background: #000; }
+    .videoWrap video {
+      width: 100%;
+      height: auto;
+      transform-origin: center center;
+      object-fit: cover;
+      will-change: transform;
+      position: relative;
+      z-index: 1;
+      display: block;
+      border-radius: 14px;
+      border: 1px solid #d7e0ee;
+      background: #000;
+    }
+    #flashOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      mix-blend-mode: screen;
+      z-index: 3;
+    }
+    #flashOverlay.ok  { background: rgba(34, 197, 94, 0.80); }
+    #flashOverlay.dup { background: rgba(245, 158, 11, 0.40); }
+    #flashOverlay.err { background: rgba(239, 68, 68, 0.40); }
 
-  .clubRow { display:flex; gap:12px; align-items:flex-end; flex-wrap: wrap; }
-  .clubRow > .grow { flex: 1 1 320px; }
-  .rowpos { display:flex; gap:10px; align-items:center; padding-bottom: 2px; flex-wrap: wrap; }
-  .label { font-size: 12px; opacity: .8; margin-bottom: 6px; }
-  .tiny { font-size: 12px; opacity: .75; }
+    /* Keep qr-scanner overlay SVG visible so outlines render */
+    /* .scan-region-highlight-svg { display: none !important; } */
+    .scan-region-highlight {
+      z-index: 5;
+    }
 
-  .videoWrap {
-    position: relative;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #000;
-  }
+    .history { margin-top: 10px; border-top: 1px solid #d7e0ee; padding-top: 10px; }
+    .historyItem { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border: 1px solid #d7e0ee; border-radius: 12px; margin-top: 8px; }
+    .historyLeft { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
-  .videoWrap video {
-    width: 100%;
-    height: auto;
-    transform-origin: center center;
-    object-fit: cover;
-    will-change: transform;
-  }
+    select.camSelect{
+      border: 1px solid #c6d2e6;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      max-width: 280px;
+    }
+    select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
 
-  video { width: 100%; display:block; border-radius: 14px; border: 1px solid #d7e0ee; background:#000; }
-  #flashOverlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 120ms ease;
-    mix-blend-mode: screen;
-  }
-  #flashOverlay.ok  { background: rgba(34, 197, 94, 0.80); }
-  #flashOverlay.dup { background: rgba(245, 158, 11, 0.40); }
-  #flashOverlay.err { background: rgba(239, 68, 68, 0.40); }
-  .scan-region-highlight-svg {display: none!important;}
+    .queueLine { margin-top: 6px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .qPill { border-color:#c6d2e6; }
+    .qGood { color:#0f8a4c; border-color:#9ae6b4; background:#f0fff4; }
+    .qWarn { color:#b45309; border-color:#fcd34d; background:#fffbeb; }
+    .qSev  { color:#7c2d12; border-color:#fdba74; background:#fff7ed; }
+    .qBad  { color:#b91c1c; border-color:#fca5a5; background:#fef2f2; }
+  </style>
 
-  .history { margin-top: 10px; border-top: 1px solid #d7e0ee; padding-top: 10px; }
-  .historyItem { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border: 1px solid #d7e0ee; border-radius: 12px; margin-top: 8px; }
-  .historyLeft { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-
-  select.camSelect{
-    border: 1px solid #c6d2e6;
-    background: #ffffff;
-    color: #0f172a;
-    border-radius: 12px;
-    padding: 10px 12px;
-    cursor: pointer;
-    max-width: 280px;
-  }
-  select.camSelect:disabled{ opacity:.55; cursor:not-allowed; }
-
-  /* Queue warning line */
-  .queueLine { margin-top: 6px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
-  .qPill { border-color:#c6d2e6; }
-  .qGood { color:#0f8a4c; border-color:#9ae6b4; background:#f0fff4; }
-  .qWarn { color:#b45309; border-color:#fcd34d; background:#fffbeb; }
-  .qSev  { color:#7c2d12; border-color:#fdba74; background:#fff7ed; }
-  .qBad  { color:#b91c1c; border-color:#fca5a5; background:#fef2f2; }
-</style>
-
-  <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+  <!-- Legacy build (worker inlined) for Apps Script iframe stability.
+       Using jsDelivr tends to be more reliable on filtered/managed networks than some CDNs. -->
+  <script src="https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.legacy.min.js"></script>
 </head>
 
 <body>
@@ -630,10 +627,9 @@
 
   async function startCamera() {
     if (typeof QrScanner === "undefined") {
-      showStatus({status:"ERROR", message:"qr-scanner failed to load."});
+      showStatus({status:"ERROR", message:"qr-scanner failed to load (blocked by network policy?)"});
       return;
     }
-    QrScanner.WORKER_PATH = "https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js";
 
     try {
       await stopCamera(true);
@@ -654,24 +650,54 @@
           logScan(raw, "camera");
         },
         {
-          preferredCamera: (selectedCameraId || "environment"),
-          maxScansPerSecond: 15,
-          calculateScanRegion: (video) => {
-            const w = video.videoWidth || video.clientWidth;
-            const h = video.videoHeight || video.clientHeight;
-            return { x: 0, y: 0, width: w, height: h };
-          },
+          returnDetailedScanResult: true,
           highlightScanRegion: true,
-          highlightCodeOutline: true
+          highlightCodeOutline: true,
+
+          // Safari stability
+          maxScansPerSecond: 10,
+
+          // Managed Macs sometimes throttle large streams; 640x480 is more consistent
+          videoConstraints: {
+            facingMode: "environment",
+            width:  { ideal: 640 },
+            height: { ideal: 480 }
+          },
+
+          // Centered region + downscale = big performance win across devices
+          calculateScanRegion: (video) => {
+            const w = video.videoWidth || video.clientWidth || 1280;
+            const h = video.videoHeight || video.clientHeight || 720;
+
+            const size = Math.floor(Math.min(w, h) * 0.66);
+            const x = Math.floor((w - size) / 2);
+            const y = Math.floor((h - size) / 2);
+
+            return { x, y, width: size, height: size, downScaledWidth: 400, downScaledHeight: 400 };
+          },
+
+          preferredCamera: (selectedCameraId || "environment"),
+          onDecodeError: () => {}
         }
       );
 
       els.btnStartCam.disabled = true;
       const old = els.btnStartCam.textContent;
       els.btnStartCam.textContent = "Starting…";
+
       await scanner.start();
+
+      // On desktop, "preferredCamera" can be ignored; enforce the exact deviceId if available
+      if (selectedCameraId) {
+        try { await scanner.setCamera(selectedCameraId); } catch (_) {}
+      }
+
+      // Better for screen glare / inverted contrast
+      try { scanner.setInversionMode("both"); } catch (_) {}
+
       freezeVideoOrientation();
       camRunning = true;
+
       els.btnStartCam.disabled = false;
       els.btnStartCam.textContent = old;
 
@@ -830,7 +856,7 @@
     }
   };
 
-  // init (refresh resumes uploads automatically)
+  // ---- init ----
   renderState();
   clearHistory();
   loadSendQueue();
