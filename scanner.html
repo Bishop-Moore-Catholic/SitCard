@@ -96,6 +96,10 @@
     .qWarn { color:#b45309; border-color:#fcd34d; background:#fffbeb; }
     .qSev  { color:#7c2d12; border-color:#fdba74; background:#fff7ed; }
     .qBad  { color:#b91c1c; border-color:#fca5a5; background:#fef2f2; }
+  
+    /* Mirror toggle: flips the video + qr overlay together */
+    .videoWrap.mirrored { transform: scaleX(-1); transform-origin: center; }
+
   </style>
 
   <!-- Legacy build (worker inlined) for Apps Script iframe stability.
@@ -156,8 +160,8 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <select id="camSelect" class="camSelect" title="Camera source"></select>
         <button class="btn" id="btnRefreshCams" title="Refresh camera list">Refresh</button>
-        <button class="btn btnPrimary" id="btnStartCam">Start Camera</button>
-        <button class="btn" id="btnStopCam">Stop</button>
+        <button class="btn btnPrimary" id="btnStartCam">Start Camera</button>        <button class="btn" id="btnMirror" type="button">Mirror: Off</button>
+<button class="btn" id="btnStopCam">Stop</button>
       </div>
     </div>
 
@@ -215,6 +219,7 @@
     btnSaveClub: document.getElementById("btnSaveClub"),
     btnStartCam: document.getElementById("btnStartCam"),
     btnStopCam: document.getElementById("btnStopCam"),
+    btnMirror: document.getElementById("btnMirror"),
     camSelect: document.getElementById("camSelect"),
     btnRefreshCams: document.getElementById("btnRefreshCams"),
     video: document.getElementById("video"),
@@ -634,7 +639,11 @@
     try {
       await stopCamera(true);
       await refreshCameras(false);
-      selectedCameraId = els.camSelect && !els.camSelect.disabled ? (els.camSelect.value || selectedCameraId) : selectedCameraId;
+      selectedCameraId = els.camSelect && !els.camSelect.disabled ? (els.camSelect.value || selectedCameraId || "") : (selectedCameraId || "");
+      if (!selectedCameraId && els.camSelect && els.camSelect.options && els.camSelect.options.length) {
+        selectedCameraId = els.camSelect.options[0].value || "";
+        if (selectedCameraId) els.camSelect.value = selectedCameraId;
+      }
 
       scanner = new QrScanner(
         els.video,
@@ -685,7 +694,14 @@
       const old = els.btnStartCam.textContent;
       els.btnStartCam.textContent = "Starting…";
 
-      await scanner.start();
+      try {
+        await scanner.start();
+      } catch (e) {
+        // Safari/managed Macs sometimes "AbortError" on immediate restart after stop
+        await new Promise(r => setTimeout(r, 700));
+        await scanner.start();
+      }
+
 
       // On desktop, "preferredCamera" can be ignored; enforce the exact deviceId if available
       if (selectedCameraId) {
@@ -712,16 +728,32 @@
 
   async function stopCamera(destroy = false) {
     try {
+      // Stop qr-scanner
       if (scanner) {
-        scanner.stop();
+        try { scanner.stop(); } catch (_) {}
         camRunning = false;
+
         if (destroy) {
-          scanner.destroy();
+          try { scanner.destroy(); } catch (_) {}
           scanner = null;
         }
       }
-    } catch (e) {}
+
+      // IMPORTANT: fully release MediaStream (Safari can "abort" next start if this stays attached)
+      const v = els.video;
+      const stream = v && v.srcObject;
+      if (stream && stream.getTracks) {
+        stream.getTracks().forEach(t => {
+          try { t.stop(); } catch (_) {}
+        });
+      }
+      if (v) v.srcObject = null;
+
+    } catch (e) {
+      // swallow
+    }
   }
+
 
   // ---- record scan (ASYNC, BATCHED upload) ----
   function logScan(payload, source) {
@@ -781,6 +813,9 @@
     resetSeenThisSession();
     renderState();
     showScanningClub();
+    // Capture current dropdown selection (desktop Safari can fail on "environment")
+    if (els.camSelect && !els.camSelect.disabled) selectedCameraId = els.camSelect.value || selectedCameraId || "";
+    await new Promise(r => setTimeout(r, 300));
     await startCamera();
   };
 
@@ -841,6 +876,21 @@
   };
 
   function freezeVideoOrientation() { els.video.style.transform = "rotate(0deg)"; }
+
+  // ---- mirror toggle (localStorage-backed) ----
+  const MIRROR_KEY = "yearbook.scanner.mirror";
+  function applyMirror(on) {
+    const wrap = els.video?.closest(".videoWrap");
+    if (!wrap) return;
+    wrap.classList.toggle("mirrored", !!on);
+  }
+  function loadMirror() {
+    try { return localStorage.getItem(MIRROR_KEY) === "1"; } catch { return false; }
+  }
+  function saveMirror(on) {
+    try { localStorage.setItem(MIRROR_KEY, on ? "1" : "0"); } catch {}
+  }
+
   window.addEventListener("orientationchange", () => { freezeVideoOrientation(); });
 
   // camera source controls
@@ -862,6 +912,19 @@
   loadSendQueue();
   updateQueueUI();
   flushSendQueue();
+  // Mirror toggle init (button)
+  let mirrorOn = loadMirror();
+  applyMirror(mirrorOn);
+  if (els.btnMirror) {
+    const syncMirrorBtn = () => { els.btnMirror.textContent = mirrorOn ? "Mirror: On" : "Mirror: Off"; };
+    syncMirrorBtn();
+    els.btnMirror.addEventListener("click", () => {
+      mirrorOn = !mirrorOn;
+      applyMirror(mirrorOn);
+      saveMirror(mirrorOn);
+      syncMirrorBtn();
+    });
+  }
 
   refreshCameras(true);
   showStatus({status:"OK", message:"Enter a club name, then press Save Club (locks + starts camera)."});
