@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Student QR Generator</title>
+  <title>Digital Sit Card</title>
 
   <style>
     :root {
@@ -98,7 +98,7 @@
     .modalHeader h2 { font-size: 16px; margin: 0; }
 
     .modalBody { padding: 14px 16px 16px; }
-    .modalHint { color: var(--textMuted); font-size: 12px; }
+    .modalHint { color: var(--textMuted); font-size: 14px; }
 
     .warnText {
       text-align: center;
@@ -147,8 +147,8 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Generate Your Photo QR Code</h1>
-      <div class="hint">Fill this out while you’re in line. Keep the QR on your screen.</div>
+      <h1>Generate Your Digital Sit Card</h1>
+      <div class="hint">Fill this out while you’re in line. Keep the QR on your screen. <strong>Please no nicknames!</strong></div>
 
       <div class="grid">
         <div>
@@ -168,7 +168,7 @@
       </div>
 
       <div class="row">
-        <button id="generate" class="primary">Generate QR</button>
+        <button id="generate" class="primary">Generate Sit Card</button>
         <button id="clear">Clear</button>
       </div>
     </div>
@@ -176,9 +176,10 @@
 
   <div id="qrModal" class="modal" aria-hidden="true">
     <div class="modalPanel">
-      <div class="modalHeader"><h2>Your QR Code</h2></div>
+      <div class="modalHeader"><h2>Your Digital Sit Card</h2></div>
       <div class="modalBody">
-        <div class="modalHint">Show this QR at checkout.</div>
+        <div class="modalHint">Show this QR to the attendant.</div>
+        <div class="modalHint"><strong>DO NOT SKIP THE LINE!</strong> THE ORDER WILL DETERMINE YOUR NAME IN THE PHOTO!</div>
         <div id="modalQRFrame">
           <img id="modalQRImg" alt="QR Code" />
         </div>
