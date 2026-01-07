@@ -82,7 +82,7 @@
     /* ===== Modal (Trading Card) ===== */
     .modal {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,.7);
+      background: rgba(0,0,0,.9);
       display: none;
       z-index: 9999;
       padding: 16px;
@@ -189,12 +189,12 @@
     .tcTitle{
       font-weight: 900;
       letter-spacing: .4px;
-      color: #fff3d8;
+      color: white;
     }
 
     .tcSub{
       font-size: 12px;
-      color: rgba(220,235,255,.8);
+      color: white;
       margin-top: 2px;
     }
 
@@ -233,16 +233,16 @@
 
       width: 64px;
       height: 64px;
-      padding: 8px;
+      padding: 3px;
       background: rgba(255,255,255,.92);
-      border-radius: 16px;
+      border-radius: 50%;
       border: 1px solid rgba(144,128,96,.25);
       box-shadow: 0 10px 30px rgba(0,0,0,.4);
 
       pointer-events: none;
     }
 
-    @media (max-width: 420px) {
+    @media (max-width: 400px) {
       .qrLogo {
         display: none;
       }
