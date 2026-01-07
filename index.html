@@ -13,6 +13,12 @@
       --err: #b42318;
       --blue: #0969da;
       --radius: 12px;
+
+      /* BMC crest gold palette */
+      --bmcGold: #908060;
+      --bmcGold2: #a79267;
+      --bmcGoldLight: #cdbf9e;
+      --bmcInk: #0b0f18;
     }
 
     *, *::before, *::after { box-sizing: border-box; }
@@ -73,7 +79,7 @@
 
     .error { color: var(--err); font-size: 13px; margin-top: 10px; display:none; }
 
-    /* ===== Modal ===== */
+    /* ===== Modal (Trading Card) ===== */
     .modal {
       position: fixed; inset: 0;
       background: rgba(0,0,0,.7);
@@ -83,63 +89,196 @@
     }
     .modal[aria-hidden="false"] { display: grid; place-items: center; }
 
-    .modalPanel {
-      width: min(560px, 100%);
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 10px 35px rgba(0,0,0,.35);
+    .tcCard{
+      width: min(520px, 100%);
+      position: relative;
+      border-radius: 22px;
       overflow: hidden;
+      isolation: isolate;
+
+      background:
+        radial-gradient(140% 140% at 0% 0%,
+          rgba(144,128,96,.22) 0%,
+          rgba(11,15,24,1) 55%,
+          rgba(7,10,18,1) 100%);
+      border: 1px solid rgba(144,128,96,.35);
+      box-shadow:
+        0 20px 60px rgba(0,0,0,.55),
+        inset 0 0 0 1px rgba(255,255,255,.05);
+
+      --rx: 0deg;
+      --ry: 0deg;
+      --mx: 50%;
+      --my: 50%;
+
+      transform: rotateX(var(--rx)) rotateY(var(--ry));
+      transform-style: preserve-3d;
     }
 
-    .modalHeader {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
+   /* Foil shimmer (loop-safe + larger scale, bright/pearly + gold) */
+  .tcFoil{
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+    /* Keep the corner fix */
+    border-radius: 22px;
+    clip-path: inset(0 round 22px);
+
+    /* Keep blend inside card */
+    mix-blend-mode: screen;
+    opacity: .45;
+    isolation: isolate;
+  }
+
+  /* Put the moving shimmer on a pseudo element so clipping is perfect */
+  .tcFoil::before{
+    content:"";
+    position:absolute;
+    inset: -120%;              /* <-- BIGGER “scale” so drift is visible */
+    border-radius: 999px;
+
+    background:
+      conic-gradient(
+        from 180deg at var(--mx) var(--my),
+        rgba(255, 233, 190, .95),
+        rgba(255, 214, 140, .90),
+        rgba(255, 245, 225, .90),
+        rgba(210, 245, 255, .75),
+        rgba(240, 220, 255, .75),
+        rgba(220, 255, 235, .75),
+        rgba(255, 223, 165, .92),
+        rgba(255, 233, 190, .95)
+      );
+
+    filter: blur(16px) saturate(1.28) brightness(1.08);
+
+    /* ✅ Closed loop: 0% and 100% match exactly */
+    animation: foilLoop 4.2s linear infinite;
+  }
+
+  /* Loop-safe drift + rotation */
+  @keyframes foilLoop{
+    0%   { transform: translate3d(-10%, -7%, 0) rotate(0deg); }
+    50%  { transform: translate3d( 10%,  7%, 0) rotate(180deg); }
+    100% { transform: translate3d(-10%, -7%, 0) rotate(360deg); }
+}
+
+
+    .tcEdge{
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      pointer-events: none;
+      clip-path: inset(0 round 22px);
+
+      background:
+        linear-gradient(135deg,
+          rgba(205,191,158,.55),
+          rgba(255,255,255,.08),
+          rgba(144,128,96,.35));
+      mix-blend-mode: screen;
     }
-    .modalHeader h2 { font-size: 16px; margin: 0; }
 
-    .modalBody { padding: 14px 16px 16px; }
-    .modalHint { color: var(--textMuted); font-size: 14px; }
+    .tcInner{
+      position: relative;
+      padding: 18px 16px 20px;
+      text-align: center;
+    }
 
-    .warnText {
+    .tcTitle{
+      font-weight: 900;
+      letter-spacing: .4px;
+      color: #fff3d8;
+    }
+
+    .tcSub{
+      font-size: 12px;
+      color: rgba(220,235,255,.8);
+      margin-top: 2px;
+    }
+
+    .tcQRWrap{
+      position: relative;
+      margin: 16px auto;
+      padding: 14px;
+      background: rgba(255,255,255,.06);
+      border-radius: 18px;
+      border: 1px solid rgba(255,215,140,.2);
+
+      /* ✅ hard center on all devices */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tcQRWrap img#modalQRImg{
+      display: block;
+
+      /* ✅ deterministic box */
+      width: min(320px, 80vw);
+      height: auto;
+
+      background: #fff;
+      border-radius: 12px;
+    }
+
+    .qrLogo{
+      position: absolute;
+
+      /* ✅ true center anchor */
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+
+      width: 64px;
+      height: 64px;
+      padding: 8px;
+      background: rgba(255,255,255,.92);
+      border-radius: 16px;
+      border: 1px solid rgba(144,128,96,.25);
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+
+      pointer-events: none;
+    }
+
+    @media (max-width: 420px) {
+      .qrLogo {
+        display: none;
+      }
+    }
+    
+    .tcQRWrap{ position: relative; }
+
+    .tcName{
+      font-size: 22px;
+      font-weight: 900;
+      color: #fff;
+      margin-top: 6px;
+    }
+
+    .tcMeta{
+      font-size: 12px;
+      color: rgba(220,235,255,.8);
+    }
+
+    .warnText{
       text-align: center;
       font-size: 12px;
-      color: var(--textMuted);
-      margin-top: 10px;
+      color: rgba(220,235,255,.75);
+      margin-top: 8px;
       min-height: 18px;
     }
 
-    .modalFooter {
-      display: flex; gap: 10px; justify-content: center;
-      padding: 14px 16px;
-      border-top: 1px solid var(--border);
-    }
-
-    #modalQRFrame {
-      margin: 14px auto 0;
-      width: 100%;
-      max-width: 360px;
-      aspect-ratio: 1 / 1;
-      padding: 14px;
-      border: 1px dashed var(--border);
-      border-radius: 14px;
-      background: #fff;
+    .tcActions{
       display: grid;
-      place-items: center;
-    }
-
-    #modalQRImg {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      image-rendering: pixelated;
-      display: block;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
     }
 
     @media (max-width: 720px) {
       .grid { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 420px) {
-      #modalQRFrame { max-width: 92vw; padding: 12px; }
     }
   </style>
 </head>
@@ -175,19 +314,28 @@
   </div>
 
   <div id="qrModal" class="modal" aria-hidden="true">
-    <div class="modalPanel">
-      <div class="modalHeader"><h2>Your Digital Sit Card</h2></div>
-      <div class="modalBody">
-        <div class="modalHint">Show this QR to the attendant.</div>
-        <div class="modalHint"><strong>DO NOT SKIP THE LINE!</strong> THE ORDER WILL DETERMINE YOUR NAME IN THE PHOTO!</div>
-        <div id="modalQRFrame">
+    <div class="tcCard">
+      <div class="tcFoil"></div>
+      <div class="tcEdge"></div>
+
+      <div class="tcInner">
+        <div class="tcTitle">BMC Digital Sit Card</div>
+        <div class="tcSub">Present to attendant after your picture is taken.</div>
+
+        <div class="tcQRWrap">
           <img id="modalQRImg" alt="QR Code" />
+          <img class="qrLogo" src="logo.png" alt="" onerror="this.style.display='none'" />
         </div>
+
+        <div class="tcName" id="cardName"></div>
+        <div class="tcMeta">Student ID: <span id="cardSid"></span></div>
+
         <div id="warnText" class="warnText"></div>
-      </div>
-      <div class="modalFooter">
-        <button id="modalClose">Close</button>
-        <button id="modalClear" class="danger">Clear</button>
+
+        <div class="tcActions">
+          <button id="modalClose">Close</button>
+          <button id="modalClear" class="danger">Clear</button>
+        </div>
       </div>
     </div>
   </div>
@@ -206,7 +354,6 @@
     const modalQRImg = document.getElementById("modalQRImg");
     const warnText = document.getElementById("warnText");
 
-    // double-confirm actions (prevents accidental close/clear)
     let closeArmed = false;
     let clearArmed = false;
     let armTimer = null;
@@ -225,8 +372,6 @@
         armTimer = null;
       }, 2500);
     }
-
-    const COOKIE = "bmc_last_qr_payload";
 
     function setError(msg){
       errEl.style.display = msg ? "block":"none";
@@ -257,15 +402,92 @@
 
     function renderQR(payload){
       const tmp = document.createElement("div");
+      tmp.style.position = "fixed";
+      tmp.style.left = "-99999px";
+      tmp.style.top = "0";
       document.body.appendChild(tmp);
-      new QRCode(tmp,{text:payload,width:420,height:420});
+
+      // Render using existing settings
+      new QRCode(tmp, { text: payload, width: 420, height: 420 });
+
       const canvas = tmp.querySelector("canvas");
-      modalQRImg.src = canvas.toDataURL("image/png");
+
+      // --- Normalize QR centering (fix asymmetric quiet-zone) ---
+      try {
+        const srcW = canvas.width;
+        const srcH = canvas.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const img = ctx.getImageData(0, 0, srcW, srcH).data;
+
+        // Find bounds of "dark" pixels (ignore the white margin)
+        let minX = srcW, minY = srcH, maxX = -1, maxY = -1;
+
+        // Threshold: treat anything not near-white as "dark module"
+        const isDark = (r, g, b, a) => a > 0 && (r + g + b) < 740; // ~ not-white
+
+        for (let y = 0; y < srcH; y++) {
+          for (let x = 0; x < srcW; x++) {
+            const i = (y * srcW + x) * 4;
+            if (isDark(img[i], img[i+1], img[i+2], img[i+3])) {
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        // If bounds are valid, re-center with equal margins
+        if (maxX > minX && maxY > minY) {
+          const contentW = (maxX - minX + 1);
+          const contentH = (maxY - minY + 1);
+          const contentSize = Math.max(contentW, contentH);
+
+          // Keep a comfortable quiet zone (padding) around the modules
+          const pad = Math.round(srcW * 0.08); // ~8% padding
+          const outSize = contentSize + pad * 2;
+
+          const out = document.createElement("canvas");
+          out.width = outSize;
+          out.height = outSize;
+          const octx = out.getContext("2d");
+
+          // White background
+          octx.fillStyle = "#fff";
+          octx.fillRect(0, 0, outSize, outSize);
+
+          // Draw cropped content centered
+          const dx = Math.round((outSize - contentW) / 2);
+          const dy = Math.round((outSize - contentH) / 2);
+
+          octx.drawImage(
+            canvas,
+            minX, minY, contentW, contentH,
+            dx, dy, contentW, contentH
+          );
+
+          modalQRImg.src = out.toDataURL("image/png");
+        } else {
+          // Fallback to original
+          modalQRImg.src = canvas.toDataURL("image/png");
+        }
+      } catch (e) {
+        // Fallback to original if anything goes wrong
+        modalQRImg.src = canvas.toDataURL("image/png");
+      }
+
+      // Populate trading card labels (your step 4)
+      try {
+        const obj = JSON.parse(payload);
+        document.getElementById("cardName").textContent = (obj.f||"")+" "+(obj.l||"");
+        document.getElementById("cardSid").textContent = obj.sid||"";
+      } catch(e){}
+
       tmp.remove();
     }
 
+
     function openModal(){
-      // modal is intentionally not dismissable without double-confirm actions
       closeArmed = false;
       clearArmed = false;
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
@@ -277,7 +499,6 @@
     document.getElementById("generate").onclick = ()=>{
       const payload = buildPayload();
       if (!payload) return;
-      document.cookie = COOKIE+"="+encodeURIComponent(payload)+";path=/";
       renderQR(payload);
       openModal();
     };
@@ -286,7 +507,6 @@
       firstEl.value = lastEl.value = sidEl.value = "";
       modalQRImg.src = "";
       setError("");
-      document.cookie = COOKIE+"=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/";
     };
 
     document.getElementById("modalClose").onclick = ()=>{
@@ -306,27 +526,21 @@
 
     sidEl.addEventListener("input", validateSid);
 
-    // Prevent Escape key from dismissing the modal (students should not accidentally close it)
-    window.addEventListener("keydown",(e)=>{
-      if (e.key !== "Escape") return;
-      if (modal.getAttribute("aria-hidden") === "false") {
-        e.preventDefault();
-        arm("close");
-      }
+    const card = document.querySelector(".tcCard");
+    card?.addEventListener("pointermove",(e)=>{
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      card.style.setProperty("--ry", ((px - .5) * 10) + "deg");
+      card.style.setProperty("--rx", ((.5 - py) * 10) + "deg");
+      card.style.setProperty("--mx", (px * 100) + "%");
+      card.style.setProperty("--my", (py * 100) + "%");
     });
-
-    window.addEventListener("load",()=>{
-      const match = document.cookie.match(/bmc_last_qr_payload=([^;]+)/);
-      if (!match) return;
-      const payload = decodeURIComponent(match[1]);
-      try {
-        const obj = JSON.parse(payload);
-        firstEl.value = obj.f || "";
-        lastEl.value = obj.l || "";
-        sidEl.value = obj.sid || "";
-        renderQR(payload);
-        openModal();
-      } catch(e){}
+    card?.addEventListener("pointerleave",()=>{
+      card.style.setProperty("--rx","0deg");
+      card.style.setProperty("--ry","0deg");
+      card.style.setProperty("--mx","50%");
+      card.style.setProperty("--my","50%");
     });
   </script>
 </body>
