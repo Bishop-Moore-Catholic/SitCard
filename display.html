@@ -323,7 +323,55 @@
       object-fit: contain;
       background: #000;
     }
-  </style>
+  
+/* --- Multi-club layout + auto scaling (Current Photographing card) --- */
+.clubList{
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.clubList.count-3,
+.clubList.count-4,
+.clubList.count-4plus{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 18px);
+}
+
+.pill{
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  border-radius: 22px;
+  padding: clamp(18px, 2.1vw, 30px);
+  font-weight: 950;
+  font-size: clamp(34px, 4.2vw, 72px);
+  line-height: 1.05;
+  word-break: break-word;
+}
+
+.clubList.count-1 .pill{
+  font-size: clamp(44px, 5.0vw, 84px);
+  padding: clamp(22px, 2.4vw, 34px);
+}
+
+.clubList.count-2 .pill{
+  font-size: clamp(38px, 4.4vw, 76px);
+  padding: clamp(20px, 2.2vw, 32px);
+}
+
+.clubList.count-3 .pill{
+  font-size: clamp(30px, 3.2vw, 56px);
+  padding: clamp(16px, 1.6vw, 24px);
+  line-height: 1.08;
+}
+
+.clubList.count-4 .pill,
+.clubList.count-4plus .pill{
+  font-size: clamp(26px, 2.6vw, 46px);
+  padding: clamp(14px, 1.4vw, 22px);
+  line-height: 1.10;
+}
+
+</style>
 </head>
 
 <body>
@@ -460,22 +508,46 @@
 
   function clearNode(node){ while(node.firstChild) node.removeChild(node.firstChild); }
 
-  function pills(node, clubs){
-    clearNode(node);
-    if (!clubs || clubs.length === 0){
-      const span = document.createElement('div');
-      span.className = 'muted';
-      span.textContent = '—';
-      node.appendChild(span);
-      return;
-    }
-    clubs.forEach(c => {
-      const p = document.createElement('div');
-      p.className = 'pill';
-      p.textContent = c;
-      node.appendChild(p);
-    });
+  
+function pills(node, clubs){
+  clearNode(node);
+
+  node.classList.remove("count-0","count-1","count-2","count-3","count-4","count-4plus");
+
+  const list = Array.isArray(clubs) ? clubs.filter(Boolean) : [];
+  const count = list.length;
+
+  if (count <= 0) node.classList.add("count-0");
+  else if (count === 1) node.classList.add("count-1");
+  else if (count === 2) node.classList.add("count-2");
+  else if (count === 3) node.classList.add("count-3");
+  else if (count === 4) node.classList.add("count-4");
+  else node.classList.add("count-4plus");
+
+  if (count === 0){
+    const span = document.createElement('div');
+    span.className = 'muted';
+    span.textContent = '—';
+    node.appendChild(span);
+    return;
   }
+
+  const show = list.slice(0, 4);
+  show.forEach(c => {
+    const p = document.createElement('div');
+    p.className = 'pill';
+    p.textContent = c;
+    node.appendChild(p);
+  });
+
+  const extra = count - show.length;
+  if (extra > 0){
+    const p = document.createElement('div');
+    p.className = 'pill';
+    p.textContent = `+${extra} more`;
+    node.appendChild(p);
+  }
+}
 
   function escapeHTML(s){
     return String(s).replace(/[&<>"']/g, c => ({
